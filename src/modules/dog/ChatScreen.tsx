@@ -4,6 +4,7 @@ import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, BookOpen, ChevronDown, Heart, MoreHorizontal, Send, X } from 'lucide-react-native';
 import { Skia } from '@shopify/react-native-skia';
+import { Easing, runOnJS, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { fetchDogAssets } from './api/shelters';
 import { GardenScene, type GardenDogArt } from './garden/GardenScene';
 import { fonts } from '../../shared/lib/fonts';
@@ -11,6 +12,8 @@ import { TOPICS } from './console/topics';
 import { useDogChat } from './hooks/useDogChat';
 import { useDogSaved } from './hooks/useDogSaved';
 import type { RootStackParamList } from '../../app/navigation';
+
+const ARRIVAL_DURATION_MS = 780;
 
 /** The approved “둘만의 정원” conversation surface, using the selected dog's real sprite. */
 export function ChatScreen() {
@@ -23,7 +26,11 @@ export function ChatScreen() {
   const [dogArt, setDogArt] = useState<GardenDogArt | null>(null);
   const [travelDogArt, setTravelDogArt] = useState<GardenDogArt | null>(null);
   const [artLoaded, setArtLoaded] = useState(false);
+  const loading = state.status === 'loading' || !artLoaded;
   const [frameIndex, setFrameIndex] = useState(0);
+  const arrivalProgress = useSharedValue(0);
+  const [arrivalActive, setArrivalActive] = useState(false);
+  const reduceMotion = useReducedMotion();
   const [draft, setDraft] = useState('');
   const [menu, setMenu] = useState(false);
   const [history, setHistory] = useState(false);
@@ -67,6 +74,27 @@ export function ChatScreen() {
   }, [params.dogId]);
 
   useEffect(() => {
+    if (loading) {
+      arrivalProgress.value = 0;
+      setArrivalActive(false);
+      return;
+    }
+    if (!dogArt) {
+      setArrivalActive(false);
+      return;
+    }
+    arrivalProgress.value = 0;
+    setArrivalActive(true);
+    arrivalProgress.value = withTiming(1, {
+      duration: reduceMotion ? 1 : ARRIVAL_DURATION_MS,
+      easing: Easing.linear,
+    }, finished => {
+      if (finished) runOnJS(setArrivalActive)(false);
+    });
+    return () => { arrivalProgress.value = 0; };
+  }, [arrivalProgress, dogArt, loading, params.dogId, reduceMotion]);
+
+  useEffect(() => {
     const activeArt = state.status === 'loading' || !artLoaded ? travelDogArt ?? dogArt : dogArt;
     if (!activeArt || activeArt.clip.frames.length < 2) return;
     const duration = activeArt.clip.frames[0]?.durationMs ?? 250;
@@ -87,7 +115,8 @@ export function ChatScreen() {
   const canSend = ready && state.session.canSend;
   const sending = ready && state.sending;
   const needsLogin = state.status === 'error' && (state.code === 'UNAUTHENTICATED' || state.code === 'ACCOUNT_NOT_REGISTERED');
-  const loading = state.status === 'loading' || !artLoaded;
+  const arriving = !loading && !!dogArt && arrivalActive;
+  const waitingToEnter = loading || arriving;
   const showDialogue = talking || replies.length > 0;
 
   const openProfile = () => {
@@ -120,9 +149,10 @@ export function ChatScreen() {
 
   return (
     <View style={[styles.root, loading && styles.loadingRoot]}>
-      <GardenScene width={width} height={height} dog={dogArt} travelDog={travelDogArt} frameIndex={frameIndex} loading={loading} />
+      <GardenScene width={width} height={height} dog={dogArt} travelDog={travelDogArt} frameIndex={frameIndex}
+        loading={loading} arriving={arriving} arrivalProgress={arrivalProgress} />
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {loading ? (
+        {waitingToEnter ? (
           <Pressable style={[styles.loadingBack, { top: insets.top + 12 }]} onPress={() => navigation.goBack()} accessibilityLabel="뒤로가기">
             <ArrowLeft size={24} color="#4d5a3a" />
           </Pressable>
@@ -181,6 +211,9 @@ export function ChatScreen() {
           </>
         )}
       </KeyboardAvoidingView>
+      {arriving && <View pointerEvents="none" style={[styles.arrivalHint, { bottom: insets.bottom + 46 }]}>
+        <Text style={styles.arrivalHintText}>강아지에게 다가가는 중…</Text>
+      </View>}
       {toast && <View style={[styles.toast, { top: insets.top + 78 }]}><Text style={styles.toastText}>{toast}</Text></View>}
     </View>
   );
@@ -232,6 +265,8 @@ const styles = StyleSheet.create({
   loginButton: { marginTop: 7, alignSelf: 'flex-start' },
   loginText: { fontFamily: fonts.pixel, fontSize: 14, color: '#64773b', textDecorationLine: 'underline' },
   loadingBack: { position: 'absolute', left: 16, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  arrivalHint: { position: 'absolute', alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: 'rgba(255,250,225,0.88)' },
+  arrivalHintText: { fontFamily: fonts.pixel, fontSize: 12, color: '#657852' },
   toast: { position: 'absolute', alignSelf: 'center', backgroundColor: '#fff8e7', borderColor: '#d3bd8d', borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
   toastText: { fontFamily: fonts.body, color: '#3c4b31' },
 });
