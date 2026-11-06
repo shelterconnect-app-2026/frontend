@@ -30,6 +30,7 @@ export function ChatScreen() {
   const [frameIndex, setFrameIndex] = useState(0);
   const arrivalProgress = useSharedValue(0);
   const [arrivalActive, setArrivalActive] = useState(false);
+  const [arrivalFinished, setArrivalFinished] = useState(false);
   const reduceMotion = useReducedMotion();
   const [draft, setDraft] = useState('');
   const [menu, setMenu] = useState(false);
@@ -77,19 +78,25 @@ export function ChatScreen() {
     if (loading) {
       arrivalProgress.value = 0;
       setArrivalActive(false);
+      setArrivalFinished(false);
       return;
     }
     if (!dogArt) {
       setArrivalActive(false);
+      setArrivalFinished(true);
       return;
     }
     arrivalProgress.value = 0;
     setArrivalActive(true);
+    setArrivalFinished(false);
     arrivalProgress.value = withTiming(1, {
       duration: reduceMotion ? 1 : ARRIVAL_DURATION_MS,
       easing: Easing.linear,
     }, finished => {
-      if (finished) runOnJS(setArrivalActive)(false);
+      if (finished) {
+        runOnJS(setArrivalActive)(false);
+        runOnJS(setArrivalFinished)(true);
+      }
     });
     return () => { arrivalProgress.value = 0; };
   }, [arrivalProgress, dogArt, loading, params.dogId, reduceMotion]);
@@ -116,7 +123,7 @@ export function ChatScreen() {
   const sending = ready && state.sending;
   const needsLogin = state.status === 'error' && (state.code === 'UNAUTHENTICATED' || state.code === 'ACCOUNT_NOT_REGISTERED');
   const arriving = !loading && !!dogArt && arrivalActive;
-  const waitingToEnter = loading || arriving;
+  const waitingToEnter = loading || (!!dogArt && !arrivalFinished);
   const showDialogue = talking || replies.length > 0;
 
   const openProfile = () => {
