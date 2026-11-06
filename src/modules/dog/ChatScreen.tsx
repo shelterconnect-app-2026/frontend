@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, BookOpen, ChevronDown, Heart, MoreHorizontal, Send, X } from 'lucide-react-native';
 import { Skia } from '@shopify/react-native-skia';
 import { Easing, runOnJS, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import { getDogPreviewArt } from './api/dogAssetPreviewCache';
 import { fetchDogAssets } from './api/shelters';
 import { GardenScene, type GardenDogArt } from './garden/GardenScene';
 import { fonts } from '../../shared/lib/fonts';
@@ -43,6 +44,13 @@ export function ChatScreen() {
   // Decode signed art immediately; the image remains usable after the URL expires.
   useEffect(() => {
     let cancelled = false;
+    const cached = getDogPreviewArt(params.dogId);
+    if (cached?.idle) {
+      setDogArt(cached.idle);
+      setTravelDogArt(cached.travel);
+      setArtLoaded(true);
+      return () => { cancelled = true; };
+    }
     setArtLoaded(false);
     setDogArt(null);
     setTravelDogArt(null);

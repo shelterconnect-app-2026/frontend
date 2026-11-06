@@ -45,6 +45,7 @@ import { PLAYER_ACTION_CELL, PLAYER_ACTION_FRAMES, PLAYER_ACTION_MS, PLAYER_ACTI
 import { stepMovement } from './core/systems/movement';
 import { Joystick } from './input/Joystick';
 import { useShelterDogs, type DogWithBehavior } from '../dog/hooks/useShelterDogs';
+import { cacheDogPreviewArt } from '../dog/api/dogAssetPreviewCache';
 import type { RootStackParamList } from '../../app/navigation';
 
 const DOG_DISPLAY_SIZE = 27;
@@ -205,6 +206,9 @@ export function GameScreen() {
       if (cancelled) {
         return;
       }
+      shelterDogs.dogs.forEach((dog, index) => {
+        cacheDogPreviewArt(dog.id, dog.manifest ?? localDogAssetManifest, sheets[index] ?? {});
+      });
       setDogSheets(sheets);
       setDogsSpawned(true);
       setDogMeta(shelterDogs.dogs);

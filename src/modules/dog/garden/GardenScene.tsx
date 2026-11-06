@@ -48,10 +48,10 @@ export function GardenScene({ width, height, dog, travelDog, frameIndex, loading
     };
   }, [width, height]);
   const frame = dog?.clip.frames[frameIndex % dog.clip.frames.length];
-  const size = Math.min(width * 0.19, 80);
+  const size = Math.min(width * 0.15, 62);
   const scale = frame ? size / frame.width : 1;
   const dogHeight = frame ? frame.height * scale : size;
-  const playerSize = Math.min(width * 0.15, 58);
+  const playerSize = Math.min(width * 0.21, 82);
   const playerStartY = height * 0.73 - playerSize / 2;
   const playerEndCenterY = height * 0.45 + dogHeight / 2 + playerSize / 2 + 3;
   const playerEndY = playerEndCenterY - playerSize / 2;
@@ -84,7 +84,7 @@ export function GardenScene({ width, height, dog, travelDog, frameIndex, loading
   const sceneScale = loadingScale * 3;
   const movingDog = travelDog ?? dog;
   const movingFrame = movingDog?.clip.frames[frameIndex % movingDog.clip.frames.length];
-  const movingSize = movingFrame ? 40 * sceneScale / Math.max(movingFrame.width, movingFrame.height) : 1;
+  const movingSize = movingFrame ? 33 * sceneScale / Math.max(movingFrame.width, movingFrame.height) : 1;
   const dogAnchorX = loadingFrame < 84 ? 66.2 + loadingFrame * 2.45 : -22 + (loadingFrame - 84) * 2.45;
   const pawState = Math.floor(loadingFrame / 10) % 3;
 
