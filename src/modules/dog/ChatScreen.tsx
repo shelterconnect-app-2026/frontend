@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, BookOpen, ChevronDown, Heart, MoreHorizontal, Send, X } from 'lucide-react-native';
@@ -21,6 +21,7 @@ export function ChatScreen() {
   const { state, send, retrySend } = useDogChat(params.dogId);
   const dogSaved = useDogSaved(params.dogId);
   const [dogArt, setDogArt] = useState<GardenDogArt | null>(null);
+  const [travelDogArt, setTravelDogArt] = useState<GardenDogArt | null>(null);
   const [artLoaded, setArtLoaded] = useState(false);
   const [frameIndex, setFrameIndex] = useState(0);
   const [draft, setDraft] = useState('');
@@ -36,14 +37,26 @@ export function ChatScreen() {
     let cancelled = false;
     setArtLoaded(false);
     setDogArt(null);
+    setTravelDogArt(null);
     (async () => {
       try {
         const { data: manifest } = await fetchDogAssets(params.dogId);
         const clip = manifest.mapDirections?.DOWN?.IDLE ?? manifest.animations.IDLE;
+        const travelClip = manifest.mapDirections?.RIGHT?.RUN ?? manifest.mapDirections?.RIGHT?.WALK
+          ?? manifest.animations.RUN ?? manifest.animations.WALK;
         if (!clip?.frames.length) return;
-        const encoded = await Skia.Data.fromURI(clip.spritesheetUrl);
-        const image = Skia.Image.MakeImageFromEncoded(encoded);
-        if (!cancelled && image) setDogArt({ image, clip });
+        const idleImage = Skia.Image.MakeImageFromEncoded(await Skia.Data.fromURI(clip.spritesheetUrl));
+        if (cancelled) return;
+        if (idleImage) setDogArt({ image: idleImage, clip });
+        if (travelClip?.frames.length) {
+          try {
+            const travelImage = travelClip.spritesheetUrl === clip.spritesheetUrl ? idleImage
+              : Skia.Image.MakeImageFromEncoded(await Skia.Data.fromURI(travelClip.spritesheetUrl));
+            if (!cancelled && travelImage) setTravelDogArt({ image: travelImage, clip: travelClip });
+          } catch {
+            // Keep the selected dog's idle art if the optional walking sheet fails.
+          }
+        }
       } catch {
         // An unavailable sprite should never be replaced with a different dog's art.
       } finally {
@@ -54,11 +67,12 @@ export function ChatScreen() {
   }, [params.dogId]);
 
   useEffect(() => {
-    if (!dogArt || dogArt.clip.frames.length < 2) return;
-    const duration = dogArt.clip.frames[0]?.durationMs ?? 250;
-    const timer = setInterval(() => setFrameIndex(index => (index + 1) % dogArt.clip.frames.length), Math.max(90, duration));
+    const activeArt = state.status === 'loading' || !artLoaded ? travelDogArt ?? dogArt : dogArt;
+    if (!activeArt || activeArt.clip.frames.length < 2) return;
+    const duration = activeArt.clip.frames[0]?.durationMs ?? 250;
+    const timer = setInterval(() => setFrameIndex(index => (index + 1) % activeArt.clip.frames.length), Math.max(90, duration));
     return () => clearInterval(timer);
-  }, [dogArt]);
+  }, [dogArt, travelDogArt, artLoaded, state.status]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), 1800);
@@ -105,8 +119,8 @@ export function ChatScreen() {
   if (state.status === 'error') dialogue = needsLogin ? '로그인하면 이야기를 나눌 수 있어.' : '대화를 불러오지 못했어. 다시 들어와 줄래?';
 
   return (
-    <View style={styles.root}>
-      <GardenScene width={width} height={height} dog={dogArt} frameIndex={frameIndex} loading={loading} />
+    <View style={[styles.root, loading && styles.loadingRoot]}>
+      <GardenScene width={width} height={height} dog={dogArt} travelDog={travelDogArt} frameIndex={frameIndex} loading={loading} />
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {loading ? (
           <Pressable style={[styles.loadingBack, { top: insets.top + 12 }]} onPress={() => navigation.goBack()} accessibilityLabel="뒤로가기">
@@ -167,7 +181,6 @@ export function ChatScreen() {
           </>
         )}
       </KeyboardAvoidingView>
-      {loading && <View style={styles.loadingIndicator}><ActivityIndicator color="#718050" /><Text style={styles.loadingText}>잠시만 기다려 주세요</Text></View>}
       {toast && <View style={[styles.toast, { top: insets.top + 78 }]}><Text style={styles.toastText}>{toast}</Text></View>}
     </View>
   );
@@ -175,6 +188,7 @@ export function ChatScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#c9d98e' },
+  loadingRoot: { backgroundColor: '#f7f5e9' },
   screen: { flex: 1, justifyContent: 'space-between' },
   header: { height: 52, marginHorizontal: 8, paddingHorizontal: 12, borderRadius: 16, backgroundColor: 'rgba(255,250,225,0.85)', borderWidth: 1, borderColor: '#e7d5a8', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerButton: { width: 42, height: 46, alignItems: 'center', justifyContent: 'center' },
@@ -218,8 +232,6 @@ const styles = StyleSheet.create({
   loginButton: { marginTop: 7, alignSelf: 'flex-start' },
   loginText: { fontFamily: fonts.pixel, fontSize: 14, color: '#64773b', textDecorationLine: 'underline' },
   loadingBack: { position: 'absolute', left: 16, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  loadingIndicator: { position: 'absolute', bottom: 108, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
-  loadingText: { fontFamily: fonts.pixel, fontSize: 13, color: '#657852' },
   toast: { position: 'absolute', alignSelf: 'center', backgroundColor: '#fff8e7', borderColor: '#d3bd8d', borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
   toastText: { fontFamily: fonts.body, color: '#3c4b31' },
 });
