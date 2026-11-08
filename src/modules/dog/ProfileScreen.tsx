@@ -13,6 +13,7 @@ import { formatBirthDate } from './birthDate';
 import { DogSprite } from './console/DogSprite';
 import { useDogProfile } from './hooks/useDogProfile';
 import { useDogSaved } from './hooks/useDogSaved';
+import { displayDogName, withKoreanConjunction } from './displayDogName';
 import { Clip, HeartSticker, PawSticker, Sparkle, Tape, Ticket } from './profile/Decor';
 import type { RootStackParamList } from '../../app/navigation';
 
@@ -27,6 +28,7 @@ export function ProfileScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { params } = useRoute<RouteProp<RootStackParamList, 'Profile'>>();
+  const dogName = displayDogName(params.dogName);
   const dogSheet = useImage(dogWalkAtlas);
   const state = useDogProfile(params.dogId);
   const dogSaved = useDogSaved(params.dogId);
@@ -200,7 +202,7 @@ export function ProfileScreen() {
         {body}
 
         <Pressable style={styles.talk} onPress={() => navigation.goBack()}>
-          <Text style={styles.talkText}>{params.dogName}와 대화하기</Text>
+          <Text style={styles.talkText}>{withKoreanConjunction(dogName)} 대화하기</Text>
           <Text style={styles.talkArrow}>↗</Text>
         </Pressable>
       </ScrollView>

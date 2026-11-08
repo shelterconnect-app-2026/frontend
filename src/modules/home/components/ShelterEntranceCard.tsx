@@ -1,24 +1,33 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Canvas, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
+import { Canvas, Image as SkiaImage, Skia, useImage, type SkImage } from '@shopify/react-native-skia';
+import { SpriteFrame } from '../../game/core/entities/SpriteFrame';
 import { useCurrentShelter } from '../../dog/hooks/useCurrentShelter';
-import { fetchShelterDetail } from '../../dog/api/shelters';
+import { fetchDogAssets, fetchShelterDetail, fetchShelterDogs } from '../../dog/api/shelters';
 import { homeImages } from '../assets/images';
 import { fonts } from '../../../shared/lib/fonts';
 import { HomeSvg } from './HomeSvg';
 import type { HomeTabScreenNavigationProp } from '../../../app/navigation';
-import type { ShelterDetail } from '../../dog/types';
+import type { DogAssetClip, DogAssetManifest, ShelterDetail } from '../../dog/types';
 
 const MAP_PREVIEW_HEIGHT = 162;
 
+interface PreviewDog {
+  id: string;
+  manifest: DogAssetManifest;
+  clip: DogAssetClip;
+  image: SkImage;
+}
+
 // Figma "Card / Shelter entrance" (node 1:97): "맵은 PNG 미리보기이며, 실제 앱에서는 기존
-// 맵 씬으로 연결합니다" — the preview is the exported 햇살 운동장 PNG; every shelter opens
-// that one map today regardless of its real mapKey (pre-existing limitation).
+// 맵 씬으로 연결합니다" — keep the exported map preview, but draw the selected shelter's
+// own approved dog sprites over it instead of the two illustration-only sample dogs.
 export function ShelterEntranceCard() {
   const navigation = useNavigation<HomeTabScreenNavigationProp>();
   const { state } = useCurrentShelter();
   const [shelter, setShelter] = useState<ShelterDetail | null>(null);
+  const [previewDogs, setPreviewDogs] = useState<PreviewDog[]>([]);
   const [mapWidth, setMapWidth] = useState(0);
   const mapImage = useImage(homeImages.mapPreview);
   const shelterId = state.status === 'ready' ? state.shelterId : null;
@@ -33,6 +42,43 @@ export function ShelterEntranceCard() {
       ({ data }) => !cancelled && setShelter(data),
       () => !cancelled && setShelter(null),
     );
+    return () => {
+      cancelled = true;
+    };
+  }, [shelterId]);
+
+  useEffect(() => {
+    if (!shelterId) {
+      setPreviewDogs([]);
+      return;
+    }
+    let cancelled = false;
+    setPreviewDogs([]);
+
+    (async () => {
+      try {
+        const { data: dogs } = await fetchShelterDogs(shelterId, { limit: 2 });
+        const sprites = await Promise.all(dogs.slice(0, 2).map(async dog => {
+          try {
+            const { data: manifest } = await fetchDogAssets(dog.id);
+            const clip = manifest.mapDirections?.DOWN?.IDLE
+              ?? manifest.animations.IDLE
+              ?? manifest.animations[manifest.fallbackAction];
+            if (!clip?.frames.length) return null;
+            const data = await Skia.Data.fromURI(clip.spritesheetUrl);
+            const image = Skia.Image.MakeImageFromEncoded(data);
+            return image ? { id: dog.id, manifest, clip, image } : null;
+          } catch {
+            // No unrelated placeholder: only dogs with this shelter's own sprite are shown.
+            return null;
+          }
+        }));
+        if (!cancelled) setPreviewDogs(sprites.filter((dog): dog is PreviewDog => dog !== null));
+      } catch {
+        if (!cancelled) setPreviewDogs([]);
+      }
+    })();
+
     return () => {
       cancelled = true;
     };
@@ -67,17 +113,38 @@ export function ShelterEntranceCard() {
       </Pressable>
 
       <View style={styles.mapPreview} onLayout={e => setMapWidth(e.nativeEvent.layout.width)}>
-        {mapImage && mapWidth > 0 && (
+        {mapWidth > 0 && (
           <Canvas style={StyleSheet.absoluteFill}>
-            <SkiaImage image={mapImage} x={0} y={0} width={mapWidth} height={MAP_PREVIEW_HEIGHT} fit="cover" />
+            {mapImage && <SkiaImage image={mapImage} x={0} y={0} width={mapWidth} height={MAP_PREVIEW_HEIGHT} fit="cover" />}
+            {previewDogs.map((dog, index) => {
+              const frame = dog.clip.frames[0];
+              const frameWidth = dog.manifest.frameSize.width;
+              const frameHeight = dog.manifest.frameSize.height;
+              const size = Math.min(40, mapWidth * 0.145);
+              const scale = size / frameWidth;
+              const groundX = mapWidth * (previewDogs.length === 1 ? 0.55 : index === 0 ? 0.43 : 0.69);
+              const groundY = MAP_PREVIEW_HEIGHT - 2;
+              return (
+                <SpriteFrame
+                  key={dog.id}
+                  sheet={dog.image}
+                  frameSize={frameWidth}
+                  col={frame.x / frameWidth}
+                  row={frame.y / frameHeight}
+                  x={groundX - dog.manifest.anchorPixels.x * scale}
+                  y={groundY - dog.manifest.anchorPixels.y * scale}
+                  size={size}
+                />
+              );
+            })}
           </Canvas>
         )}
         <View style={styles.mapLabel}>
           <Text style={styles.mapLabelText}>햇살 운동장</Text>
         </View>
-        <View style={styles.speechBubble}>
+        {previewDogs.length > 0 && <View style={styles.speechBubble}>
           <Text style={styles.speechBubbleText}>안녕, 친구!</Text>
-        </View>
+        </View>}
       </View>
 
       <PrimaryButton

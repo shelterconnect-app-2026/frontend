@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchChatMessages, openChatSession, requestChatReply, sendChatMessage } from '../api/chat';
 import { generateClientMessageId } from '../../../shared/lib/clientId';
@@ -21,9 +21,14 @@ export type DogChatState =
 /** Opens (or resumes) a dog's chat session and sends messages through it (docs/chat-storage-api.md, docs/grounded-chat-api.md). */
 export function useDogChat(dogId: string) {
   const [state, setState] = useState<DogChatState>({ status: 'loading' });
+  const loadedDogId = useRef<string | null>(null);
+  const attemptedDogId = useRef<string | null>(null);
+  const retryAfterFocus = useRef(false);
 
   const load = useCallback(() => {
     let cancelled = false;
+    attemptedDogId.current = dogId;
+    loadedDogId.current = null;
     setState({ status: 'loading' });
 
     (async () => {
@@ -31,6 +36,7 @@ export function useDogChat(dogId: string) {
         const { data: session } = await openChatSession(dogId);
         const { data: messages } = await fetchChatMessages(session.id, { limit: 50 });
         if (!cancelled) {
+          loadedDogId.current = dogId;
           setState({ status: 'ready', session, messages, sending: false, sendError: null, retryableMessageId: null });
         }
       } catch (err) {
@@ -49,11 +55,19 @@ export function useDogChat(dogId: string) {
     };
   }, [dogId]);
 
-  // A plain mount-time effect never re-runs on dogId alone — leaving a chat screen to
-  // log in and coming straight back (same dogId) would otherwise strand the screen on
-  // its earlier UNAUTHENTICATED error forever. Re-open every time this screen regains
-  // focus instead.
-  useFocusEffect(useCallback(() => load(), [load]));
+  // Load on first entry, or retry a previous failure after returning from sign-in.
+  // Keep the ready session and messages when returning from profile/menu screens so
+  // the chat does not flash a loader or re-fetch its history on every focus.
+  useFocusEffect(useCallback(() => {
+    if (loadedDogId.current === dogId) return undefined;
+    if (attemptedDogId.current === dogId && !retryAfterFocus.current) return undefined;
+    retryAfterFocus.current = false;
+    return load();
+  }, [dogId, load]));
+
+  const retryOnNextFocus = useCallback(() => {
+    retryAfterFocus.current = true;
+  }, []);
 
   const requestReply = useCallback(async (sessionId: string, userMessage: ChatMessage, retry: boolean) => {
     try {
@@ -115,5 +129,5 @@ export function useDogChat(dogId: string) {
     requestReply(state.session.id, userMessage, true);
   }, [state, requestReply]);
 
-  return { state, send, retrySend };
+  return { state, send, retrySend, retryOnNextFocus };
 }

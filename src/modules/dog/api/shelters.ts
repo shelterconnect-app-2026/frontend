@@ -1,4 +1,5 @@
 import { apiFetch } from '../../../shared/lib/apiClient';
+import { displayDogName } from '../displayDogName';
 import type { DogAssetManifest, DogBehavior, DogPhoto, DogProfile, DogSummary, Page, Shelter, ShelterDetail } from '../types';
 
 export function fetchShelters(params?: { region?: string; limit?: number; cursor?: string }) {
@@ -19,11 +20,17 @@ export function fetchShelterDogs(shelterId: string, params?: { limit?: number; c
   if (params?.limit) query.set('limit', String(params.limit));
   if (params?.cursor) query.set('cursor', params.cursor);
   const qs = query.toString();
-  return apiFetch<Page<DogSummary>>(`/v1/shelters/${shelterId}/dogs${qs ? `?${qs}` : ''}`);
+  return apiFetch<Page<DogSummary>>(`/v1/shelters/${shelterId}/dogs${qs ? `?${qs}` : ''}`).then(result => ({
+    ...result,
+    data: result.data.map(dog => ({ ...dog, name: displayDogName(dog.name) })),
+  }));
 }
 
 export function fetchDog(dogId: string) {
-  return apiFetch<{ data: DogProfile }>(`/v1/dogs/${dogId}`);
+  return apiFetch<{ data: DogProfile }>(`/v1/dogs/${dogId}`).then(result => ({
+    ...result,
+    data: { ...result.data, name: displayDogName(result.data.name) },
+  }));
 }
 
 export function fetchDogBehavior(dogId: string) {

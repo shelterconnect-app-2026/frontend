@@ -12,6 +12,7 @@ import { fonts } from '../../shared/lib/fonts';
 import { TOPICS } from './console/topics';
 import { useDogChat } from './hooks/useDogChat';
 import { useDogSaved } from './hooks/useDogSaved';
+import { displayDogName, withKoreanConjunction } from './displayDogName';
 import type { RootStackParamList } from '../../app/navigation';
 
 const ARRIVAL_DURATION_MS = 780;
@@ -20,14 +21,15 @@ const ARRIVAL_DURATION_MS = 780;
 export function ChatScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
+  const dogName = displayDogName(params.dogName);
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const { state, send, retrySend } = useDogChat(params.dogId);
+  const { state, send, retrySend, retryOnNextFocus } = useDogChat(params.dogId);
   const dogSaved = useDogSaved(params.dogId);
   const [dogArt, setDogArt] = useState<GardenDogArt | null>(null);
   const [travelDogArt, setTravelDogArt] = useState<GardenDogArt | null>(null);
   const [artLoaded, setArtLoaded] = useState(false);
-  const loading = state.status === 'loading' || !artLoaded;
+  const loading = !artLoaded;
   const [frameIndex, setFrameIndex] = useState(0);
   const arrivalProgress = useSharedValue(0);
   const [arrivalActive, setArrivalActive] = useState(false);
@@ -110,12 +112,12 @@ export function ChatScreen() {
   }, [arrivalProgress, dogArt, loading, params.dogId, reduceMotion]);
 
   useEffect(() => {
-    const activeArt = state.status === 'loading' || !artLoaded ? travelDogArt ?? dogArt : dogArt;
+    const activeArt = !artLoaded || arrivalActive ? travelDogArt ?? dogArt : dogArt;
     if (!activeArt || activeArt.clip.frames.length < 2) return;
     const duration = activeArt.clip.frames[0]?.durationMs ?? 250;
     const timer = setInterval(() => setFrameIndex(index => (index + 1) % activeArt.clip.frames.length), Math.max(90, duration));
     return () => clearInterval(timer);
-  }, [dogArt, travelDogArt, artLoaded, state.status]);
+  }, [dogArt, travelDogArt, artLoaded, arrivalActive]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), 1800);
@@ -137,9 +139,13 @@ export function ChatScreen() {
   const openProfile = () => {
     setMenu(false);
     navigation.navigate('Profile', {
-      dogId: params.dogId, dogName: params.dogName, identityIndex: params.identityIndex,
+      dogId: params.dogId, dogName, identityIndex: params.identityIndex,
       shelterName: params.shelterName, knownFacts: replies.map(message => message.text), pendingQuestions,
     });
+  };
+  const openLogin = () => {
+    retryOnNextFocus();
+    navigation.navigate('LoginGuide');
   };
   const submit = (message = draft) => {
     const text = message.trim();
@@ -152,13 +158,14 @@ export function ChatScreen() {
   };
   const toggleSave = async () => {
     setMenu(false);
-    if (dogSaved.needsLogin) { navigation.navigate('LoginGuide'); return; }
+    if (dogSaved.needsLogin) { openLogin(); return; }
     const wasSaved = dogSaved.saved;
     await dogSaved.toggle();
     setToast(wasSaved ? '저장을 취소했어요' : '저장한 친구에 추가했어요');
   };
 
-  let dialogue = selectedReply?.text ?? params.dogName + '와 어떤 이야기를 나눌까?';
+  let dialogue = selectedReply?.text ?? withKoreanConjunction(dogName) + ' 어떤 이야기를 나눌까?';
+  if (state.status === 'loading') dialogue = '대화 연결을 준비하고 있어. 잠깐만 기다려 줘.';
   if (sending) dialogue = '잠깐만, 이야기를 생각하고 있어…';
   if (state.status === 'error') dialogue = needsLogin ? '로그인하면 이야기를 나눌 수 있어.' : '대화를 불러오지 못했어. 다시 들어와 줄래?';
 
@@ -197,27 +204,27 @@ export function ChatScreen() {
                 <View style={styles.historyHeading}><Text style={styles.historyTitle}>지난 이야기</Text><Pressable onPress={() => setHistory(false)} accessibilityLabel="대화 기록 닫기"><X size={22} color="#4c593c" /></Pressable></View>
                 <ScrollView contentContainerStyle={styles.historyContent}>
                   {messages.length === 0 && <Text style={styles.historyEmpty}>아직 나눈 이야기가 없어요.</Text>}
-                  {messages.map(message => <View key={message.id} style={[styles.historyMessage, message.role === 'USER' && styles.historyMine]}><Text style={styles.historySpeaker}>{message.role === 'USER' ? '나' : params.dogName}</Text><Text style={styles.historyBody}>{message.text}</Text></View>)}
+                  {messages.map(message => <View key={message.id} style={[styles.historyMessage, message.role === 'USER' && styles.historyMine]}><Text style={styles.historySpeaker}>{message.role === 'USER' ? '나' : dogName}</Text><Text style={styles.historyBody}>{message.text}</Text></View>)}
                 </ScrollView>
               </View>
             )}
             {showDialogue ? <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 14) }]}>
               <View style={styles.dialogueCard}>
-                <View style={styles.nameplate}><Text style={styles.nameplateText}>{params.dogName}</Text></View>
+                <View style={styles.nameplate}><Text style={styles.nameplateText}>{dogName}</Text></View>
                 <ScrollView style={styles.dialogueScroll} contentContainerStyle={styles.dialogueContent} showsVerticalScrollIndicator={false}>
                   <Text style={styles.dialogueText}>{dialogue}</Text>
                 </ScrollView>
-                {state.status === 'error' && needsLogin && <Pressable style={styles.loginButton} onPress={() => navigation.navigate('LoginGuide')}><Text style={styles.loginText}>로그인하기</Text></Pressable>}
+                {state.status === 'error' && needsLogin && <Pressable style={styles.loginButton} onPress={openLogin}><Text style={styles.loginText}>로그인하기</Text></Pressable>}
                 {replies.length > 1 && <Pressable style={styles.nextButton} onPress={() => setDialogueIndex(index => index === null ? 0 : (index + 1) % replies.length)} accessibilityLabel="다른 대화 보기"><ChevronDown size={25} color="#7d8750" fill="#7d8750" /></Pressable>}
               </View>
               {ready && state.sendError && <View style={styles.errorRow}><Text style={styles.errorText}>{state.sendError}</Text>{state.retryableMessageId && <Pressable onPress={retrySend}><Text style={styles.errorRetry}>다시 시도</Text></Pressable>}</View>}
               {selectedReply?.needsShelterConfirmation && lastQuestion && <Pressable style={styles.confirmButton} onPress={() => setPendingQuestions(previous => previous.includes(lastQuestion.text) ? previous : [...previous, lastQuestion.text])} disabled={pendingQuestions.includes(lastQuestion.text)}><Text style={styles.confirmText}>{pendingQuestions.includes(lastQuestion.text) ? '보호소 확인 질문에 담았어요' : '보호소에 확인할 질문으로 담기'}</Text></Pressable>}
               <View style={styles.composer}>
-                <TextInput style={styles.input} value={draft} onChangeText={setDraft} placeholder={params.dogName + '에게 답장하기…'} placeholderTextColor="#828572" editable={canSend && !sending} maxLength={300} returnKeyType="send" onSubmitEditing={() => submit()} accessibilityLabel="강아지에게 메시지 입력" />
+                <TextInput style={styles.input} value={draft} onChangeText={setDraft} placeholder={dogName + '에게 답장하기…'} placeholderTextColor="#828572" editable={canSend && !sending} maxLength={300} returnKeyType="send" onSubmitEditing={() => submit()} accessibilityLabel="강아지에게 메시지 입력" />
                 <Pressable style={[styles.sendButton, (!draft.trim() || !canSend || sending) && styles.sendDisabled]} onPress={() => submit()} disabled={!draft.trim() || !canSend || sending} accessibilityLabel="메시지 보내기"><Send size={20} color="#fff9e8" fill="#fff9e8" /></Pressable>
               </View>
             </View> : <View style={[styles.intro, { marginBottom: Math.max(insets.bottom, 14) + 20 }]}>
-              <Text style={styles.introTitle}>{params.dogName}와 둘만의 시간</Text>
+              <Text style={styles.introTitle}>{withKoreanConjunction(dogName)} 둘만의 시간</Text>
               <Text style={styles.introText}>가까이에서 천천히 이야기를 나눠봐요.</Text>
               <Pressable style={styles.talkButton} onPress={() => setTalking(true)} accessibilityLabel="강아지와 대화하기">
                 <Text style={styles.talkButtonText}>대화하기</Text>

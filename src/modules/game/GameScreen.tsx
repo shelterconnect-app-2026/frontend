@@ -46,6 +46,7 @@ import { stepMovement } from './core/systems/movement';
 import { Joystick } from './input/Joystick';
 import { useShelterDogs, type DogWithBehavior } from '../dog/hooks/useShelterDogs';
 import { cacheDogPreviewArt } from '../dog/api/dogAssetPreviewCache';
+import { displayDogName } from '../dog/displayDogName';
 import type { RootStackParamList } from '../../app/navigation';
 
 const DOG_DISPLAY_SIZE = 27;
@@ -514,7 +515,7 @@ export function GameScreen() {
     }
     navigation.navigate('Chat', {
       dogId: dog.id,
-      dogName: dog.name,
+      dogName: displayDogName(dog.name),
       identityIndex: talkTargetIndex % DOG_IDENTITY_COUNT,
       shelterName: params.shelterName,
     });
