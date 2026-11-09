@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthSession } from '../../../shared/lib/useAuthSession';
 import { fetchCurrentShelterPreference, updateCurrentShelterPreference } from '../api/preferences';
@@ -15,27 +16,33 @@ export function useCurrentShelter() {
   const session = useAuthSession();
   const [state, setState] = useState<CurrentShelterState>({ status: 'loading' });
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (session.status === 'loading') {
       return;
     }
     let cancelled = false;
-    setState({ status: 'loading' });
 
     (async () => {
-      const shelterId =
-        session.status === 'signedIn'
-          ? (await fetchCurrentShelterPreference()).data?.currentShelterId ?? null
-          : await AsyncStorage.getItem(ANON_STORAGE_KEY);
-      if (!cancelled) {
-        setState({ status: 'ready', shelterId });
+      try {
+        const shelterId =
+          session.status === 'signedIn'
+            ? (await fetchCurrentShelterPreference()).data?.currentShelterId ?? null
+            : await AsyncStorage.getItem(ANON_STORAGE_KEY);
+        if (!cancelled) {
+          setState({ status: 'ready', shelterId });
+        }
+      } catch {
+        // A temporary preference request failure should not erase the last known selection.
+        if (!cancelled) {
+          setState(previous => previous.status === 'ready' ? previous : { status: 'ready', shelterId: null });
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [session.status]);
+  }, [session.status]));
 
   const setCurrentShelter = useCallback(
     async (shelterId: string) => {

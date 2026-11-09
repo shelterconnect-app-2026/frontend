@@ -140,7 +140,9 @@ export function ChatScreen() {
     setMenu(false);
     navigation.navigate('Profile', {
       dogId: params.dogId, dogName, identityIndex: params.identityIndex,
-      shelterName: params.shelterName, knownFacts: replies.map(message => message.text), pendingQuestions,
+      shelterName: params.shelterName,
+      knownFacts: replies.filter(message => !message.needsShelterConfirmation).map(message => message.text),
+      pendingQuestions,
     });
   };
   const openLogin = () => {
