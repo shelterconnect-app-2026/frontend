@@ -39,8 +39,16 @@ export function useDogChat(dogId: string, existingSessionId?: string) {
           : await openChatSession(dogId);
         const { data: messages } = await fetchChatMessages(session.id, { limit: 50 });
         if (!cancelled) {
+          const lastMessage = messages.at(-1);
+          const unansweredMessageId = lastMessage?.role === 'USER' && lastMessage.processingStatus !== 'COMPLETED'
+            ? lastMessage.id
+            : null;
           loadedChatKey.current = chatKey;
-          setState({ status: 'ready', session, messages, sending: false, sendError: null, retryableMessageId: null });
+          setState({
+            status: 'ready', session, messages, sending: false,
+            sendError: unansweredMessageId ? '이전 메시지의 답변이 아직 도착하지 않았어요.' : null,
+            retryableMessageId: unansweredMessageId,
+          });
         }
       } catch (err) {
         if (!cancelled) {
