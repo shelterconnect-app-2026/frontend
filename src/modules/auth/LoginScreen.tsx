@@ -30,6 +30,7 @@ export function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
 
   if (!supabase) {
     return (
@@ -51,6 +52,7 @@ export function LoginScreen() {
     setBusy(true);
     setError(null);
     setNotice(null);
+    setNeedsConfirmation(false);
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (authError) {
@@ -64,6 +66,29 @@ export function LoginScreen() {
       leaveAuthFlow(navigation);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : String(err);
+      setNeedsConfirmation(message.toLowerCase().includes('email not confirmed'));
+      setError(authErrorMessage(message));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendConfirmation() {
+    if (!supabase || busy || !email.trim()) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const { error: resendError } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
+      if (resendError) {
+        throw resendError;
+      }
+      setNeedsConfirmation(false);
+      setNotice('새 확인 메일을 보냈어요. 받은 편지함을 확인해 주세요.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       setError(authErrorMessage(message));
     } finally {
       setBusy(false);
@@ -125,6 +150,11 @@ export function LoginScreen() {
       </Pressable>
 
       {error && <Text style={styles.errorText}>{error}</Text>}
+      {needsConfirmation && (
+        <Pressable onPress={resendConfirmation} disabled={busy} hitSlop={8}>
+          <Text style={styles.resendText}>확인 메일 다시 보내기</Text>
+        </Pressable>
+      )}
       {notice && <Text style={styles.noticeText}>{notice}</Text>}
 
       <View style={styles.submit}>
@@ -203,6 +233,7 @@ const styles = StyleSheet.create({
   forgot: { alignSelf: 'flex-end', marginTop: 16 },
   forgotText: { fontFamily: fonts.body, fontSize: 11, lineHeight: 15, color: '#a38aaf' },
   errorText: { fontFamily: fonts.body, fontSize: 12, color: '#c0526b', marginTop: 12 },
+  resendText: { fontFamily: fonts.body, fontSize: 12, color: '#9278a6', textDecorationLine: 'underline', marginTop: 8 },
   noticeText: { fontFamily: fonts.body, fontSize: 12, color: '#6f8f5f', marginTop: 12 },
   submit: { marginTop: 24 },
   switchRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 28, marginTop: 28 },
