@@ -10,11 +10,12 @@ import { formatBirthDate } from './birthDate';
 import { RealDogSprite } from './console/RealDogSprite';
 import { useDogProfile } from './hooks/useDogProfile';
 import { useDogSaved } from './hooks/useDogSaved';
-import { fetchDogAssets } from './api/shelters';
+import { fetchDogAssets, fetchDogPhotos } from './api/shelters';
 import { getDogPreviewArt } from './api/dogAssetPreviewCache';
 import { displayDogName, withKoreanConjunction } from './displayDogName';
 import { displayDogIntroduction } from './displayDogIntroduction';
 import type { GardenDogArt } from './garden/GardenScene';
+import type { DogPhoto } from './types';
 import { Clip, HeartSticker, PawSticker, Sparkle, Tape, Ticket } from './profile/Decor';
 import type { RootStackParamList } from '../../app/navigation';
 
@@ -92,7 +93,7 @@ export function ProfileScreen() {
                 <Tape />
                 <Text style={styles.photoNote}>나랑 친구할래? ↘</Text>
                 <View style={styles.portraitImage}>
-                  {showPhoto ? <SignedProfilePhoto url={showPhoto.url} art={dogArt} /> : <RealDogSprite art={dogArt} size={118} />}
+                  {showPhoto ? <SignedProfilePhoto dogId={params.dogId} photo={showPhoto} /> : <RealDogSprite art={dogArt} size={118} />}
                 </View>
                 <Text style={styles.portraitCaption}>HELLO, {profile.name.toUpperCase()} ♡</Text>
               </View>
@@ -233,30 +234,51 @@ export function ProfileScreen() {
   );
 }
 
-function SignedProfilePhoto({ url, art }: { url: string; art: GardenDogArt | null }) {
+function SignedProfilePhoto({ dogId, photo }: { dogId: string; photo: DogPhoto }) {
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const image = useImage(bytes);
 
   useEffect(() => {
     let cancelled = false;
     setBytes(null);
-    // The short-lived signed URL is readable with fetch in React Native, while
-    // Skia's direct URI loader does not reliably finish this endpoint on iOS.
-    fetch(url)
-      .then(response => {
+    setLoadError(false);
+    (async () => {
+      const renewUrl = async () => {
+        const { data: photos } = await fetchDogPhotos(dogId);
+        const renewed = photos.find(item => item.id === photo.id);
+        if (!renewed) throw new Error('Photo no longer available');
+        return renewed.url;
+      };
+      try {
+        const expiresAt = Date.parse(photo.expiresAt);
+        const renewed = retry > 0 || (Number.isFinite(expiresAt) && expiresAt <= Date.now() + 5_000);
+        let url = renewed ? await renewUrl() : photo.url;
+        let response = await fetch(url);
+        if (!response.ok && response.status >= 400 && response.status < 500 && !renewed) {
+          url = await renewUrl();
+          response = await fetch(url);
+        }
         if (!response.ok) throw new Error(`Photo HTTP ${response.status}`);
-        return response.arrayBuffer();
-      })
-      .then(buffer => {
+        const buffer = await response.arrayBuffer();
         if (!cancelled) setBytes(new Uint8Array(buffer));
-      })
-      .catch(() => {
-        if (!cancelled) setBytes(null);
-      });
+      } catch {
+        if (!cancelled) setLoadError(true);
+      }
+    })();
     return () => { cancelled = true; };
-  }, [url]);
+  }, [dogId, photo.expiresAt, photo.id, photo.url, retry]);
 
-  if (!image) return <RealDogSprite art={art} size={118} />;
+  if (loadError) return (
+    <View style={styles.photoFeedback}>
+      <Text style={styles.photoFeedbackText}>사진을 불러오지 못했어요</Text>
+      <Pressable onPress={() => setRetry(value => value + 1)} accessibilityLabel="사진 다시 불러오기">
+        <Text style={styles.photoRetry}>다시 시도</Text>
+      </Pressable>
+    </View>
+  );
+  if (!image) return <ActivityIndicator color="#8b7a64" />;
   return (
     <Canvas style={styles.photoCanvas}>
       <SkiaImage image={image} x={0} y={0} width={118} height={137} fit="cover" />
@@ -295,6 +317,9 @@ const styles = StyleSheet.create({
   photoNote: { alignSelf: 'flex-end', marginRight: 6, fontFamily: fonts.body, fontSize: 9, color: '#759db2', transform: [{ rotate: '-5deg' }] },
   portraitImage: { width: 118, height: 137, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   photoCanvas: { width: 118, height: 137 },
+  photoFeedback: { width: 118, height: 137, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  photoFeedbackText: { fontFamily: fonts.body, fontSize: 11, color: '#7b6251', textAlign: 'center' },
+  photoRetry: { fontFamily: fonts.body, fontSize: 11, color: '#516d83', marginTop: 8, textDecorationLine: 'underline' },
   portraitCaption: { fontFamily: fonts.pixel, fontSize: 8, letterSpacing: 0.6, color: '#92786b', paddingTop: 6 },
   switchRow: { flexDirection: 'row', gap: 6, marginTop: 14 },
   switchPill: { height: 24, paddingHorizontal: 12, justifyContent: 'center', backgroundColor: '#f6f0e4', borderWidth: 1, borderColor: '#e5d9c9', borderRadius: 12 },
