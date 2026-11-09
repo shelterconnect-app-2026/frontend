@@ -14,6 +14,7 @@ import { DogSprite } from './console/DogSprite';
 import { useDogProfile } from './hooks/useDogProfile';
 import { useDogSaved } from './hooks/useDogSaved';
 import { displayDogName, withKoreanConjunction } from './displayDogName';
+import { displayDogIntroduction } from './displayDogIntroduction';
 import { Clip, HeartSticker, PawSticker, Sparkle, Tape, Ticket } from './profile/Decor';
 import type { RootStackParamList } from '../../app/navigation';
 
@@ -131,7 +132,7 @@ export function ProfileScreen() {
           <View style={styles.memo}>
             <View style={styles.notes}>
               <Text style={styles.notesTitle}>우리, 이렇게 친해져요</Text>
-              <Text style={styles.notesText}>{profile.introduction ?? `${profile.name}에 대한 소개 글은 아직 없어요.\n대화하며 조금씩 알아가 봐요.`}</Text>
+              <Text style={styles.notesText}>{displayDogIntroduction(profile.introduction, profile.name)}</Text>
               <Text style={styles.handHeart}>♡</Text>
             </View>
             <View style={styles.polaroid}>

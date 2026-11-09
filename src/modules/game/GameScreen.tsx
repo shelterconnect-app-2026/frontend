@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Canvas,
   FilterMode,
@@ -142,6 +143,7 @@ function dogStatusLabel(dog: DogAgent, ball: BallPlayState | undefined, ballActi
 // drops show up once more entities are added.
 export function GameScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const { params } = useRoute<RouteProp<RootStackParamList, 'Game'>>();
   const ground = useImage(groundImage);
   const grass = useImage(grassSheet);
@@ -648,6 +650,13 @@ export function GameScreen() {
         <View style={styles.joystick}>
           <Joystick onChange={(dx, dy) => { direction.current = { dx, dy }; }} />
         </View>
+        <Pressable
+          style={[styles.backButton, { top: insets.top + 8 }]}
+          onPress={() => navigation.goBack()}
+          accessibilityLabel="보호소로 돌아가기"
+        >
+          <Text style={styles.backButtonText}>← 보호소</Text>
+        </Pressable>
         {talkTargetIndex !== null && (
           <Pressable style={styles.talkButton} onPress={openChat}>
             <Text style={styles.talkButtonText}>말 걸기</Text>
@@ -684,6 +693,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     bottom: 16,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 16,
+    borderRadius: 18,
+    paddingVertical: 9,
+    paddingHorizontal: 13,
+    backgroundColor: 'rgba(40, 53, 32, 0.72)',
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   talkButton: {
     position: 'absolute',
