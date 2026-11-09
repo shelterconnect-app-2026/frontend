@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Canvas, FilterMode, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
@@ -103,7 +103,7 @@ export function LoginScreen() {
           value={email}
           onChangeText={setEmail}
           placeholder="이메일 주소를 입력해 주세요"
-          keyboardType="email-address"
+          keyboardType={Platform.OS === 'ios' ? 'ascii-capable' : 'email-address'}
           autoComplete="email"
           editable={!busy}
         />

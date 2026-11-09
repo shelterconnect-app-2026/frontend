@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Check, ChevronRight, Lock, Mail, PawPrint, User } from 'lucide-react-native';
@@ -107,7 +107,7 @@ export function SignUpScreen() {
 
       <View style={styles.fields}>
         <AuthField label="닉네임" Icon={User} value={nickname} onChangeText={setNickname} placeholder="이웃에게 보여줄 이름" maxLength={40} editable={!busy} />
-        <AuthField label="이메일" Icon={Mail} value={email} onChangeText={setEmail} placeholder="이메일 주소를 입력해 주세요" keyboardType="email-address" autoComplete="email" editable={!busy} />
+        <AuthField label="이메일" Icon={Mail} value={email} onChangeText={setEmail} placeholder="이메일 주소를 입력해 주세요" keyboardType={Platform.OS === 'ios' ? 'ascii-capable' : 'email-address'} autoComplete="email" editable={!busy} />
         <AuthField label="비밀번호" Icon={Lock} secure value={password} onChangeText={setPassword} placeholder="비밀번호를 입력해 주세요" autoComplete="new-password" editable={!busy} />
         <AuthField label="비밀번호 확인" Icon={Lock} secure value={passwordConfirm} onChangeText={setPasswordConfirm} placeholder="비밀번호를 한 번 더 입력해 주세요" autoComplete="new-password" editable={!busy} />
       </View>
