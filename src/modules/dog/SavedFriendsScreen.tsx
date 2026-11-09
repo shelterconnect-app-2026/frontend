@@ -157,6 +157,7 @@ export function SavedFriendsScreen() {
                 dogName: dog.dogName,
                 identityIndex: dogs.indexOf(dog) % 3,
                 shelterName: dog.shelterName,
+                sessionId: dog.sessionId ?? undefined,
               })
             }
           />

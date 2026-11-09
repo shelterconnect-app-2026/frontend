@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { ChevronRight, MessageSquare, User } from 'lucide-react-native';
-import { useInquiryRooms } from '../inquiry/hooks/useInquiryRooms';
+import type { InquiryRoomsState } from '../inquiry/hooks/useInquiryRooms';
 import { postStatusLabel } from '../inquiry/messages';
 import { useMediaUrl } from '../community/hooks/useMediaUrl';
 import type { InquiryRoom } from '../inquiry/types';
@@ -25,19 +25,18 @@ const STATUS_CHIP: Record<string, { bg: string; fg: string }> = {
 const DEFAULT_CHIP = { bg: '#efeaf3', fg: '#9d8cab' };
 
 // Figma "04 대화 · 이웃 문의" (pencil xdNoF) and its 안 읽음 filter state (H96Do7).
-export function InquiryRoomsList({ onUnreadCount }: { onUnreadCount: (count: number) => void }) {
-  const navigation = useNavigation<HomeTabScreenNavigationProp>();
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const [sort, setSort] = useState<RoomSort>('RECENT');
-  const { state, reload } = useInquiryRooms({ q: search, unreadOnly: filter === 'unread' });
+type InquiryRoomsListProps = {
+  state: InquiryRoomsState;
+  reload: () => void;
+  search: string;
+  onSearchChange: (value: string) => void;
+  filter: 'all' | 'unread';
+  onFilterChange: (value: 'all' | 'unread') => void;
+};
 
-  const unreadRoomCount = state.status === 'ready' ? state.unreadRoomCount : null;
-  useEffect(() => {
-    if (unreadRoomCount !== null) {
-      onUnreadCount(unreadRoomCount);
-    }
-  }, [unreadRoomCount, onUnreadCount]);
+export function InquiryRoomsList({ state, reload, search, onSearchChange, filter, onFilterChange }: InquiryRoomsListProps) {
+  const navigation = useNavigation<HomeTabScreenNavigationProp>();
+  const [sort, setSort] = useState<RoomSort>('RECENT');
 
   if (state.status === 'anon') {
     return (
@@ -57,14 +56,14 @@ export function InquiryRoomsList({ onUnreadCount }: { onUnreadCount: (count: num
 
   return (
     <View>
-      <SearchBox value={search} onChangeText={setSearch} placeholder="이웃 이름이나 게시글로 검색" />
+      <SearchBox value={search} onChangeText={onSearchChange} placeholder="이웃 이름이나 게시글로 검색" />
       <FilterRow
         options={[
           { key: 'all', label: '전체', count: filter === 'all' ? rooms.length : undefined },
           { key: 'unread', label: '안 읽음', count: unreadRooms },
         ]}
         selected={filter}
-        onSelect={key => setFilter(key as 'all' | 'unread')}
+        onSelect={key => onFilterChange(key as 'all' | 'unread')}
         sort={<SortButton options={ROOM_SORTS} value={sort} onChange={setSort} />}
       />
 

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { MessageSquare, MessagesSquare, PawPrint } from 'lucide-react-native';
 import { fonts } from '../../shared/lib/fonts';
+import { useInquiryRooms } from '../inquiry/hooks/useInquiryRooms';
 import { DogConversationsList } from './DogConversationsList';
 import { InquiryRoomsList } from './InquiryRoomsList';
 
@@ -13,7 +14,13 @@ type Segment = 'dog' | 'inquiry';
 export function ConversationsScreen() {
   const insets = useSafeAreaInsets();
   const [segment, setSegment] = useState<Segment>('dog');
-  const [unreadRooms, setUnreadRooms] = useState(0);
+  const [inquirySearch, setInquirySearch] = useState('');
+  const [inquiryFilter, setInquiryFilter] = useState<'all' | 'unread'>('all');
+  const { state: inquiryState, reload: reloadInquiryRooms } = useInquiryRooms({
+    q: inquirySearch,
+    unreadOnly: inquiryFilter === 'unread',
+  });
+  const unreadRooms = inquiryState.status === 'ready' ? inquiryState.unreadRoomCount : 0;
 
   return (
     <View style={styles.root}>
@@ -52,7 +59,18 @@ export function ConversationsScreen() {
         </View>
 
         <View style={styles.body}>
-          {segment === 'dog' ? <DogConversationsList /> : <InquiryRoomsList onUnreadCount={setUnreadRooms} />}
+          {segment === 'dog' ? (
+            <DogConversationsList />
+          ) : (
+            <InquiryRoomsList
+              state={inquiryState}
+              reload={reloadInquiryRooms}
+              search={inquirySearch}
+              onSearchChange={setInquirySearch}
+              filter={inquiryFilter}
+              onFilterChange={setInquiryFilter}
+            />
+          )}
         </View>
       </ScrollView>
     </View>

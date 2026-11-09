@@ -100,6 +100,7 @@ export function DogConversationsList() {
                     dogName: conversation.dogName,
                     identityIndex: index % 3,
                     shelterName: conversation.shelterName,
+                    sessionId: conversation.sessionId,
                   })
                 }
               />
