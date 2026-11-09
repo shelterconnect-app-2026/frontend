@@ -6,6 +6,10 @@ export function openChatSession(dogId: string) {
   return apiFetch<{ data: ChatSession }>(`/v1/dogs/${dogId}/chat-sessions`, { method: 'POST' });
 }
 
+export function fetchChatSession(sessionId: string) {
+  return apiFetch<{ data: ChatSession }>(`/v1/chat-sessions/${sessionId}`);
+}
+
 export function fetchChatMessages(sessionId: string, params?: { limit?: number; cursor?: string }) {
   const query = new URLSearchParams();
   if (params?.limit) query.set('limit', String(params.limit));

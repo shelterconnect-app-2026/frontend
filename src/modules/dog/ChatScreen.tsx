@@ -24,7 +24,7 @@ export function ChatScreen() {
   const dogName = displayDogName(params.dogName);
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const { state, send, retrySend, retryOnNextFocus } = useDogChat(params.dogId);
+  const { state, send, retrySend, retryOnNextFocus } = useDogChat(params.dogId, params.sessionId);
   const dogSaved = useDogSaved(params.dogId);
   const [dogArt, setDogArt] = useState<GardenDogArt | null>(null);
   const [travelDogArt, setTravelDogArt] = useState<GardenDogArt | null>(null);

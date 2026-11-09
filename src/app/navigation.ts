@@ -15,7 +15,7 @@ export type MainTabParamList = {
 export type RootStackParamList = {
   Home: undefined;
   Game: { shelterId: string; shelterName: string };
-  Chat: { dogId: string; dogName: string; identityIndex: number; shelterName: string };
+  Chat: { dogId: string; dogName: string; identityIndex: number; shelterName: string; sessionId?: string };
   Login: undefined;
   SignUp: undefined;
   // Figma 17(로그인 안내)·19(로그인 만료) — 같은 시트, 문구만 다름.

@@ -53,7 +53,8 @@ Supabase SDK의 저장 어댑터는 `secureAuthStorage.ts`다. iOS Keychain과 A
 
 네이티브 의존성이 추가됐으므로 `npm ci`, iOS `pod install`, 앱 재빌드가 필요하다. Metro 새로고침만으로는 적용되지 않는다. 로그인 → 앱 재시작 → 토큰 갱신 → 로그아웃 → 재시작 순서로 두 플랫폼에서 확인한다. iOS Keychain은 앱 삭제 후에도 남을 수 있으므로 계정 변경/테스트 초기화는 로그아웃으로 한다.
 
-## (확인 필요)
-- Supabase 프로젝트의 `SUPABASE_ANON_KEY` (URL은 확인됨: `https://gwimdiwrqfcqulefshoz.supabase.co`,
-  `.env.example` 참고) — 백엔드팀에게 요청. 이게 없으면 로그인 화면이 폼 대신 안내 문구만 보여줌
+## 인증 서버 설정
+- `SUPABASE_URL`은 `https://auth.shelterconnect.win`으로 설정한다. SDK가 `/auth/v1` 경로를 붙인다.
+- `SUPABASE_ANON_KEY`에는 인증 서버에서 사용하는 공개 키를 설정한다. 값이 없으면 로그인 화면이 폼 대신 안내 문구만 보여준다.
+- 회원가입 화면은 `GET /v1/registration-policy`가 `available=false`를 반환하면 아직 공개되지 않은 약관의 동의를 요구하거나 저장하지 않는다. 문서 공개 후 서버의 `TERMS_VERSION`·`PRIVACY_VERSION`을 설정하고 실제 문서 링크를 화면에 연결해야 동의 단계를 활성화할 수 있다.
 - 소셜 로그인 여부는 여전히 미정(백엔드 문서 "C-02에서 정할 내용") — 이메일/비밀번호만 우선 구현

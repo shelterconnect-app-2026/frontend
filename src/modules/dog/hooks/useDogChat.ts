@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { fetchChatMessages, openChatSession, requestChatReply, sendChatMessage } from '../api/chat';
+import { fetchChatMessages, fetchChatSession, openChatSession, requestChatReply, sendChatMessage } from '../api/chat';
 import { generateClientMessageId } from '../../../shared/lib/clientId';
 import { ApiError } from '../../../shared/lib/apiClient';
 import type { ChatMessage, ChatSession } from '../types';
@@ -19,24 +19,27 @@ export type DogChatState =
     };
 
 /** Opens (or resumes) a dog's chat session and sends messages through it (docs/chat-storage-api.md, docs/grounded-chat-api.md). */
-export function useDogChat(dogId: string) {
+export function useDogChat(dogId: string, existingSessionId?: string) {
   const [state, setState] = useState<DogChatState>({ status: 'loading' });
-  const loadedDogId = useRef<string | null>(null);
-  const attemptedDogId = useRef<string | null>(null);
+  const loadedChatKey = useRef<string | null>(null);
+  const attemptedChatKey = useRef<string | null>(null);
   const retryAfterFocus = useRef(false);
+  const chatKey = `${dogId}:${existingSessionId ?? 'new'}`;
 
   const load = useCallback(() => {
     let cancelled = false;
-    attemptedDogId.current = dogId;
-    loadedDogId.current = null;
+    attemptedChatKey.current = chatKey;
+    loadedChatKey.current = null;
     setState({ status: 'loading' });
 
     (async () => {
       try {
-        const { data: session } = await openChatSession(dogId);
+        const { data: session } = existingSessionId
+          ? await fetchChatSession(existingSessionId)
+          : await openChatSession(dogId);
         const { data: messages } = await fetchChatMessages(session.id, { limit: 50 });
         if (!cancelled) {
-          loadedDogId.current = dogId;
+          loadedChatKey.current = chatKey;
           setState({ status: 'ready', session, messages, sending: false, sendError: null, retryableMessageId: null });
         }
       } catch (err) {
@@ -53,17 +56,17 @@ export function useDogChat(dogId: string) {
     return () => {
       cancelled = true;
     };
-  }, [dogId]);
+  }, [chatKey, dogId, existingSessionId]);
 
   // Load on first entry, or retry a previous failure after returning from sign-in.
   // Keep the ready session and messages when returning from profile/menu screens so
   // the chat does not flash a loader or re-fetch its history on every focus.
   useFocusEffect(useCallback(() => {
-    if (loadedDogId.current === dogId) return undefined;
-    if (attemptedDogId.current === dogId && !retryAfterFocus.current) return undefined;
+    if (loadedChatKey.current === chatKey) return undefined;
+    if (attemptedChatKey.current === chatKey && !retryAfterFocus.current) return undefined;
     retryAfterFocus.current = false;
     return load();
-  }, [dogId, load]));
+  }, [chatKey, load]));
 
   const retryOnNextFocus = useCallback(() => {
     retryAfterFocus.current = true;

@@ -29,7 +29,7 @@ export interface SignUpForm {
 }
 
 /** First problem found, in the order the fields appear — null when the form can be submitted. */
-export function signUpError(form: SignUpForm): string | null {
+export function signUpError(form: SignUpForm, requireConsent = true): string | null {
   const nickname = nicknameError(form.nickname);
   if (nickname) {
     return nickname;
@@ -43,7 +43,7 @@ export function signUpError(form: SignUpForm): string | null {
   if (form.password !== form.passwordConfirm) {
     return '비밀번호가 서로 달라요.';
   }
-  if (!form.termsAccepted || !form.privacyAccepted) {
+  if (requireConsent && (!form.termsAccepted || !form.privacyAccepted)) {
     return '필수 약관에 모두 동의해 주세요.';
   }
   return null;
@@ -52,6 +52,12 @@ export function signUpError(form: SignUpForm): string | null {
 /** Supabase auth errors arrive in English — show the ones people actually hit in Korean. */
 export function authErrorMessage(message: string): string {
   const text = message.toLowerCase();
+  if (text.includes('network request failed') || text.includes('failed to fetch')) {
+    return '인증 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.';
+  }
+  if (text.includes('signups not allowed') || text.includes('signup disabled') || text.includes('signups disabled')) {
+    return '현재 새 계정 가입이 중지되어 있어요. 기존 계정으로 로그인해 주세요.';
+  }
   if (text.includes('invalid login credentials')) {
     return '이메일 또는 비밀번호가 맞지 않아요.';
   }
