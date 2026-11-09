@@ -29,7 +29,7 @@ export interface SignUpForm {
 }
 
 /** First problem found, in the order the fields appear — null when the form can be submitted. */
-export function signUpError(form: SignUpForm): string | null {
+export function signUpError(form: SignUpForm, requireConsent = true): string | null {
   const nickname = nicknameError(form.nickname);
   if (nickname) {
     return nickname;
@@ -43,7 +43,7 @@ export function signUpError(form: SignUpForm): string | null {
   if (form.password !== form.passwordConfirm) {
     return '비밀번호가 서로 달라요.';
   }
-  if (!form.termsAccepted || !form.privacyAccepted) {
+  if (requireConsent && (!form.termsAccepted || !form.privacyAccepted)) {
     return '필수 약관에 모두 동의해 주세요.';
   }
   return null;

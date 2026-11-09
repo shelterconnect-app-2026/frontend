@@ -32,6 +32,7 @@ describe('signUpError', () => {
   test('both required agreements must be checked', () => {
     expect(signUpError({ ...valid, termsAccepted: false })).toContain('약관');
     expect(signUpError({ ...valid, privacyAccepted: false })).toContain('약관');
+    expect(signUpError({ ...valid, termsAccepted: false, privacyAccepted: false }, false)).toBeNull();
   });
 });
 
