@@ -267,7 +267,7 @@ function tickGreeting(
 
     if (greeting.phase === 'APPROACH') {
       if (dist <= arrivalPx) {
-        current = canPlay('TAIL_WAG', manifest)
+        current = cfg.wagDurationMs > 0 && settings.actions.TAIL_WAG.weight > 0 && canPlay('TAIL_WAG', manifest)
           ? { ...setGreetingState(current, 'TAIL_WAG'), greeting: { ...greeting, phase: 'WAG', phaseRemainingMs: cfg.wagDurationMs } }
           : { ...setGreetingState(current, 'SNIFF'), greeting: { ...greeting, phase: 'SNIFF', phaseRemainingMs: cfg.sniffDurationMs } };
       } else {
