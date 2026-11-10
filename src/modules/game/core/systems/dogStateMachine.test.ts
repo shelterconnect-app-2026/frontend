@@ -300,7 +300,7 @@ describe('PERSON_GREETING', () => {
     maxDurationMs: 10000,
     cooldownMs: 5000,
   };
-  const settings = makeSettings({ actions: { ...makeSettings().actions, WALK: { ...makeSettings().actions.WALK, speedTilesPerSecond: 2, weight: 0 }, IDLE: { ...makeSettings().actions.IDLE, weight: 100 } } });
+  const settings = makeSettings({ actions: { ...makeSettings().actions, WALK: { ...makeSettings().actions.WALK, speedTilesPerSecond: 2, weight: 0 }, IDLE: { ...makeSettings().actions.IDLE, weight: 100 }, TAIL_WAG: { ...makeSettings().actions.TAIL_WAG, weight: 20 } } });
   const player = { x: 150, y: 100 }; // 50px = ~2 tiles from the dog at (100,100)
 
   function run(agent: ReturnType<typeof createDogAgent>, ms: number, step = 50, who = player, cfg: PersonGreetingInteraction | null = greeting, s: DogBehaviorSettings = settings) {
@@ -320,6 +320,14 @@ describe('PERSON_GREETING', () => {
     expect(seen.indexOf('TAIL_WAG')).toBeLessThan(seen.indexOf('SNIFF'));
     expect(current.greeting).toBeNull();
     expect(current.greetingCooldownUntilMs).toBeGreaterThan(0);
+  });
+
+  test('the new no-tail-wag recipe walks to the player and sniffs without wagging', () => {
+    const noWag = makeSettings({ actions: { ...settings.actions, TAIL_WAG: { ...settings.actions.TAIL_WAG, weight: 0 } } });
+    const { seen } = run(createDogAgent(100, 100), 6000, 50, player, { ...greeting, wagDurationMs: 0 }, noWag);
+    expect(seen).toContain('WALK');
+    expect(seen).toContain('SNIFF');
+    expect(seen).not.toContain('TAIL_WAG');
   });
 
   test('gives up when the player leaves the trigger distance', () => {
