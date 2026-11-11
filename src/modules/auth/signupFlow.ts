@@ -9,6 +9,12 @@ export interface SignupExtras {
   consent: { termsVersion: string; privacyVersion: string } | null;
 }
 
+/** With email confirmation on, signing up an already-registered email returns a stand-in user
+ * with no identities and sends no mail (Supabase hides which emails exist). */
+export function isAlreadyRegistered(user: { identities?: unknown[] } | null): boolean {
+  return !!user && user.identities?.length === 0;
+}
+
 const pendingKey = (email: string) => `pendingSignup:${email.trim().toLowerCase()}`;
 
 /** Registers the service user, then applies the nickname and (when published) the consents. */

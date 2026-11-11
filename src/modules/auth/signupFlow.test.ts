@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { applyPendingSignup, savePendingSignup } from './signupFlow';
+import { applyPendingSignup, isAlreadyRegistered, savePendingSignup } from './signupFlow';
 import { registerServiceUser } from './api/account';
 import { saveConsents, updateDisplayName } from './api/profile';
 
@@ -43,4 +43,10 @@ test('keeps the parked data when applying fails so the next sign-in retries', as
   await savePendingSignup('c@d.co', { nickname: 'x', consent });
   await expect(applyPendingSignup('c@d.co')).rejects.toThrow('boom');
   expect(await AsyncStorage.getItem('pendingSignup:c@d.co')).not.toBeNull();
+});
+
+test('an already-registered email is recognised by its empty identities', () => {
+  expect(isAlreadyRegistered({ identities: [] })).toBe(true);
+  expect(isAlreadyRegistered({ identities: [{ provider: 'email' }] })).toBe(false);
+  expect(isAlreadyRegistered(null)).toBe(false);
 });
