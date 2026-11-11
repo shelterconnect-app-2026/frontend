@@ -4,12 +4,11 @@ import { useNavigation } from '@react-navigation/native';
 import { ChevronRight, MessageSquare, User } from 'lucide-react-native';
 import type { InquiryRoomsState } from '../inquiry/hooks/useInquiryRooms';
 import { postStatusLabel } from '../inquiry/messages';
-import { useMediaUrl } from '../community/hooks/useMediaUrl';
+import { MediaImage } from '../community/components/MediaImage';
 import type { InquiryRoom } from '../inquiry/types';
 import { fonts } from '../../shared/lib/fonts';
 import { formatRoomTime } from '../../shared/lib/chatTime';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
-import { RemoteImage } from '../../shared/ui/RemoteImage';
 import { SortButton } from '../../shared/ui/SortButton';
 import { FilterRow, SearchBox } from './ListControls';
 import { ROOM_SORTS, sortRooms, type RoomSort } from './listSort';
@@ -94,7 +93,6 @@ export function InquiryRoomsList({ state, reload, search, onSearchChange, filter
 // Figma "Card / 이웃 문의" (382×150): counterpart row + related-post preview row.
 function RoomCard({ room, index, onPress }: { room: InquiryRoom; index: number; onPress: () => void }) {
   const unread = room.unreadCount > 0;
-  const thumbUrl = useMediaUrl(room.post.thumbnailMediaId);
   const statusLabel = postStatusLabel(room.post.category, room.post.status, room.post.available);
   const chip = STATUS_CHIP[statusLabel] ?? DEFAULT_CHIP;
   const lastText = room.lastMessage ? messagePreview(room.lastMessage.kind, room.lastMessage.text) : '문의를 시작했어요.';
@@ -117,7 +115,7 @@ function RoomCard({ room, index, onPress }: { room: InquiryRoom; index: number; 
         </View>
       )}
       <View style={[styles.post, !room.post.available && styles.postMasked]}>
-        <RemoteImage url={room.post.available ? thumbUrl : null} width={40} height={40} radius={8} />
+        <MediaImage mediaId={room.post.available ? room.post.thumbnailMediaId : null} width={40} height={40} radius={8} />
         <View style={styles.postCopy}>
           <View style={[styles.postChip, { backgroundColor: chip.bg }]}>
             <Text style={[styles.postChipText, { color: chip.fg }]}>{statusLabel}</Text>

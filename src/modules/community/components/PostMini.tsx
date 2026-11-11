@@ -1,18 +1,16 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 import { fonts } from '../../../shared/lib/fonts';
-import { RemoteImage } from '../../../shared/ui/RemoteImage';
-import { useMediaUrl } from '../hooks/useMediaUrl';
+import { MediaImage } from './MediaImage';
 import { CATEGORY_LABEL, shortRegion } from '../postText';
 import type { CommunityPost } from '../types';
 
 // Figma "Card / Related community post" (382×84) — the post a comment thread / location list belongs to.
 export function PostMini({ post, onPress }: { post: CommunityPost; onPress?: () => void }) {
-  const photo = useMediaUrl(post.content.mediaIds[0]);
   const meta = [post.content.regionLabel ? shortRegion(post.content.regionLabel) : null, post.authorName].filter(Boolean).join(' · ');
   return (
     <Pressable style={styles.card} onPress={onPress} disabled={!onPress}>
-      <RemoteImage url={photo} width={62} height={62} radius={10} />
+      <MediaImage mediaId={post.content.mediaIds[0]} width={62} height={62} radius={10} />
       <View style={styles.copy}>
         <Text style={styles.category}>{CATEGORY_LABEL[post.category]}</Text>
         <Text style={styles.title} numberOfLines={1}>

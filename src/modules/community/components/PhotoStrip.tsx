@@ -3,7 +3,7 @@ import { Camera, X } from 'lucide-react-native';
 import { fonts } from '../../../shared/lib/fonts';
 import { RemoteImage } from '../../../shared/ui/RemoteImage';
 import type { ComposePhoto } from '../composeForm';
-import { useMediaUrl } from '../hooks/useMediaUrl';
+import { MediaImage } from './MediaImage';
 
 // 사진 추가 칸 + 썸네일(대표 표시 · 삭제). Newly picked photos show their local uri; photos that
 // came with an existing post load through the signed media URL. Skia-only loading (CLAUDE.md).
@@ -24,11 +24,9 @@ export function PhotoStrip({ photos, max, uploading, onAdd, onRemove }: { photos
 }
 
 function Thumb({ photo, cover, onRemove }: { photo: ComposePhoto; cover: boolean; onRemove: () => void }) {
-  const remote = useMediaUrl(photo.uri ? undefined : photo.mediaId);
-  const uri = photo.uri ?? remote;
   return (
     <View style={styles.thumb}>
-      <RemoteImage url={uri} width={82} height={82} radius={12} />
+      {photo.uri ? <RemoteImage url={photo.uri} width={82} height={82} radius={12} /> : <MediaImage mediaId={photo.mediaId} width={82} height={82} radius={12} />}
       {cover && (
         <View style={styles.coverBadge}>
           <Text style={styles.coverText}>대표</Text>

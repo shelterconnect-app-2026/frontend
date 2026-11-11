@@ -4,7 +4,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Camera, ChevronLeft, ChevronRight, MapPin, Paperclip, SendHorizontal, User } from 'lucide-react-native';
-import { useMediaUrl } from '../community/hooks/useMediaUrl';
+import { MediaImage } from '../community/components/MediaImage';
 import { formatClock, formatDayHeader, isSameDay } from '../../shared/lib/chatTime';
 import { fonts } from '../../shared/lib/fonts';
 import { getCurrentCoords, type Coords } from '../../shared/lib/deviceLocation';
@@ -13,7 +13,6 @@ import { pickPhotos, uploadCommunityPhoto } from '../../shared/lib/photoUpload';
 import { writeErrorMessage } from '../../shared/lib/communityErrors';
 import { ActionSheet, PermissionSheet, SheetButton } from '../../shared/ui/ActionSheet';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
-import { RemoteImage } from '../../shared/ui/RemoteImage';
 import { useInquiryRoom, type PendingMessage } from './hooks/useInquiryRoom';
 import { lastReadMineSequence, POST_CATEGORY_LABEL, postStatusLabel } from './messages';
 import type { InquiryMessage, InquiryRoom } from './types';
@@ -257,11 +256,10 @@ function hash(value: string): number {
 
 // Figma "Card / Related community post" (382×84).
 function PostCard({ room }: { room: InquiryRoom }) {
-  const thumb = useMediaUrl(room.post.thumbnailMediaId);
   const category = room.post.category ? POST_CATEGORY_LABEL[room.post.category] : '게시글';
   return (
     <View style={styles.postCard}>
-      <RemoteImage url={room.post.available ? thumb : null} width={62} height={62} radius={10} />
+      <MediaImage mediaId={room.post.available ? room.post.thumbnailMediaId : null} width={62} height={62} radius={10} />
       <View style={styles.postCopy}>
         <Text style={styles.postCategory}>{category}</Text>
         <Text style={styles.postTitle} numberOfLines={1}>
@@ -329,7 +327,6 @@ function MessageBubble({ message, nickname, avatarColor, showSender, read }: { m
 }
 
 function MessageContent({ message }: { message: InquiryMessage }) {
-  const imageUrl = useMediaUrl(message.kind === 'IMAGE' ? message.mediaId : null);
   const mine = message.mine;
   const textStyle = [styles.bubbleText, mine ? styles.textMine : styles.textTheirs];
 
@@ -360,7 +357,7 @@ function MessageContent({ message }: { message: InquiryMessage }) {
   if (message.kind === 'IMAGE') {
     return (
       <View>
-        <RemoteImage url={imageUrl} width={200} height={150} radius={10} />
+        <MediaImage mediaId={message.kind === 'IMAGE' ? message.mediaId : null} width={200} height={150} radius={10} />
         {!!message.text && <Text style={[textStyle, styles.imageNote]}>{message.text}</Text>}
       </View>
     );
