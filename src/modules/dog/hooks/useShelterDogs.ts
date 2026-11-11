@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { fetchDogAssets, fetchDogBehavior, fetchShelterDogs } from '../api/shelters';
 import { normalizeBehavior } from '../behaviorSettings';
+import { ApiError } from '../../../shared/lib/apiClient';
 import type { DogAssetManifest, DogBehavior, DogSummary } from '../types';
 
 /** Demo: unconfirmed dogs fetch the ball too (see normalizeBehavior). */
@@ -14,12 +15,14 @@ export interface DogWithBehavior extends DogSummary {
 
 export type ShelterDogsState =
   | { status: 'loading' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string; retry: () => void }
   | { status: 'ready'; dogs: DogWithBehavior[] };
 
 /** Fetches a shelter's public dogs and each one's behavior settings (docs/dog-behavior-api.md). */
 export function useShelterDogs(shelterId: string): ShelterDogsState {
   const [state, setState] = useState<ShelterDogsState>({ status: 'loading' });
+  const [reloadKey, setReloadKey] = useState(0);
+  const retry = useCallback(() => setReloadKey(key => key + 1), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,9 +35,14 @@ export function useShelterDogs(shelterId: string): ShelterDogsState {
           summaries.map(async dog => {
             const [behavior, manifest] = await Promise.all([
               fetchDogBehavior(dog.id),
+              // Only "no approved art" (404) falls back to the bundled sprites; any other failure
+              // surfaces as an error with retry rather than drawing a stand-in for this dog.
               fetchDogAssets(dog.id).then(
                 res => res.data,
-                () => null,
+                err => {
+                  if (err instanceof ApiError && err.status === 404) return null;
+                  throw err;
+                },
               ),
             ]);
             return {
@@ -49,7 +57,7 @@ export function useShelterDogs(shelterId: string): ShelterDogsState {
         }
       } catch (err) {
         if (!cancelled) {
-          setState({ status: 'error', message: err instanceof Error ? err.message : String(err) });
+          setState({ status: 'error', message: err instanceof Error ? err.message : String(err), retry });
         }
       }
     })();
@@ -57,7 +65,7 @@ export function useShelterDogs(shelterId: string): ShelterDogsState {
     return () => {
       cancelled = true;
     };
-  }, [shelterId]);
+  }, [shelterId, reloadKey, retry]);
 
   return state;
 }
