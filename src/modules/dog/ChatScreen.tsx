@@ -16,6 +16,7 @@ import { displayDogName, withKoreanConjunction } from './displayDogName';
 import type { RootStackParamList } from '../../app/navigation';
 
 const ARRIVAL_DURATION_MS = 780;
+const SAVE_FAILED = '저장하지 못했어요. 잠시 후 다시 눌러 주세요';
 
 /** The approved “둘만의 정원” conversation surface, using the selected dog's real sprite. */
 export function ChatScreen() {
@@ -147,20 +148,20 @@ export function ChatScreen() {
     retryOnNextFocus();
     navigation.navigate('LoginGuide');
   };
-  const submit = (message = draft) => {
+  // Keep the draft until the server has the message, so a failed send loses nothing.
+  const submit = async (message = draft) => {
     const text = message.trim();
     if (!text || !canSend || sending) return;
-    send(text);
-    setDraft('');
     setDialogueIndex(null);
     setMenu(false);
     setHistory(false);
+    if (await send(text) && message === draft) setDraft('');
   };
   const toggleSave = async () => {
     setMenu(false);
     if (dogSaved.needsLogin) { openLogin(); return; }
     const wasSaved = dogSaved.saved;
-    await dogSaved.toggle();
+    if (!await dogSaved.toggle()) { setToast(SAVE_FAILED); return; }
     setToast(wasSaved ? '저장을 취소했어요' : '저장한 친구에 추가했어요');
   };
 
@@ -217,7 +218,7 @@ export function ChatScreen() {
                 {state.status === 'error' && needsLogin && <Pressable style={styles.loginButton} onPress={openLogin}><Text style={styles.loginText}>로그인하기</Text></Pressable>}
                 {replies.length > 1 && <Pressable style={styles.nextButton} onPress={() => setDialogueIndex(index => index === null ? 0 : (index + 1) % replies.length)} accessibilityLabel="다른 대화 보기"><ChevronDown size={25} color="#7d8750" fill="#7d8750" /></Pressable>}
               </View>
-              {ready && state.sendError && <View style={styles.errorRow}><Text style={styles.errorText}>{state.sendError}</Text>{state.retryableMessageId && <Pressable onPress={retrySend}><Text style={styles.errorRetry}>다시 시도</Text></Pressable>}</View>}
+              {ready && state.sendError && <View style={styles.errorRow}><Text style={styles.errorText}>{state.sendError}</Text>{(state.retryableMessageId || state.failedSend) && <Pressable onPress={() => state.failedSend ? submit(state.failedSend.text) : retrySend()}><Text style={styles.errorRetry}>다시 시도</Text></Pressable>}</View>}
               {selectedReply?.needsShelterConfirmation && lastQuestion && <Pressable style={styles.confirmButton} onPress={() => setPendingQuestions(previous => previous.includes(lastQuestion.text) ? previous : [...previous, lastQuestion.text])} disabled={pendingQuestions.includes(lastQuestion.text)}><Text style={styles.confirmText}>{pendingQuestions.includes(lastQuestion.text) ? '보호소 확인 질문에 담았어요' : '보호소에 확인할 질문으로 담기'}</Text></Pressable>}
               <View style={styles.composer}>
                 <TextInput style={styles.input} value={draft} onChangeText={setDraft} placeholder={dogName + '에게 답장하기…'} placeholderTextColor="#828572" editable={canSend && !sending} maxLength={300} returnKeyType="send" onSubmitEditing={() => submit()} accessibilityLabel="강아지에게 메시지 입력" />

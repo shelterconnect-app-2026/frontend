@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useImage } from '@shopify/react-native-skia';
@@ -25,13 +25,17 @@ const TAG_ICONS = ['♡', '✿', '♧', 'ϟ'];
 // the backend's (GET /v1/dogs/{id}, /photos) plus what the chat gathered; the design's 건강상태·활동성 meters
 // have no API behind them, so only the shelter's own traitLabels are shown as tags.
 export function ProfileScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { params } = useRoute<RouteProp<RootStackParamList, 'Profile'>>();
   const dogName = displayDogName(params.dogName);
   const dogSheet = useImage(dogWalkAtlas);
   const state = useDogProfile(params.dogId);
   const dogSaved = useDogSaved(params.dogId);
+  const toggleSave = async () => {
+    if (dogSaved.needsLogin) { navigation.navigate('LoginGuide'); return; }
+    if (!await dogSaved.toggle()) Alert.alert('저장하지 못했어요', '잠시 후 다시 눌러 주세요.');
+  };
   const [showRealPhoto, setShowRealPhoto] = useState(true);
 
   const body = (() => {
@@ -193,7 +197,7 @@ export function ProfileScreen() {
             <ChevronLeft size={18} color="#7b8d99" strokeWidth={2} />
           </Pressable>
           <Text style={styles.navTitle}>친구의 프로필</Text>
-          <Pressable onPress={() => dogSaved.toggle()} hitSlop={10} accessibilityLabel={dogSaved.saved ? '저장 취소' : '저장하기'}>
+          <Pressable onPress={toggleSave} hitSlop={10} accessibilityLabel={dogSaved.saved ? '저장 취소' : '저장하기'}>
             <Heart size={28} color={dogSaved.saved ? '#df78a3' : '#b28bc4'} fill={dogSaved.saved ? '#df78a3' : 'none'} strokeWidth={1.8} />
           </Pressable>
         </View>
