@@ -75,9 +75,12 @@ export function SignUpScreen() {
         leaveAuthFlow(navigation);
         return;
       }
-      // 이메일 확인이 필요한 프로젝트 설정 — 확인 후 첫 로그인 때 닉네임·동의를 적용한다.
-      await savePendingSignup(email, extras);
-      Alert.alert('확인 메일을 보냈어요', '메일의 확인 링크를 누른 뒤 로그인해 주세요.', [
+      // With email confirmation enabled, GoTrue can return an obfuscated user for
+      // an existing email. Only a real new email identity can park profile data.
+      if (data.user?.id && data.user.identities?.some(identity => identity.provider === 'email')) {
+        await savePendingSignup(email, data.user.id, extras);
+      }
+      Alert.alert('가입 요청을 확인해 주세요', '새 계정이라면 확인 메일을 보냈어요. 이미 계정이 있다면 로그인하거나 비밀번호를 재설정해 주세요.', [
         { text: '확인', onPress: () => navigation.replace('Login') },
       ]);
     } catch (err) {
