@@ -23,7 +23,7 @@ import { DOG_IDENTITY_COUNT } from './core/assets/dog/dogWalkAtlas';
 import { localDogAssetManifest } from './core/assets/dog/real-v1/localManifest';
 import { usePropImages } from './core/assets/usePropImages';
 import { DogSprite } from './core/entities/DogSprite';
-import { loadDogSheets, type DogSheets } from './core/assets/loadDogSheets';
+import { loadDogSheets, loadFreshDogSheets, type DogSheets } from './core/assets/loadDogSheets';
 import { SpriteFrame } from './core/entities/SpriteFrame';
 import { createDogAgent, tickDog, type DogAgent, type DogState } from './core/systems/dogStateMachine';
 import { movementFacing } from './core/systems/spritePlayback';
@@ -46,6 +46,7 @@ import { stepMovement } from './core/systems/movement';
 import { Joystick } from './input/Joystick';
 import { useShelterDogs, type DogWithBehavior } from '../dog/hooks/useShelterDogs';
 import { cacheDogPreviewArt } from '../dog/api/dogAssetPreviewCache';
+import { fetchDogAssets } from '../dog/api/shelters';
 import { displayDogName } from '../dog/displayDogName';
 import type { RootStackParamList } from '../../app/navigation';
 
@@ -203,16 +204,25 @@ export function GameScreen() {
       return;
     }
     let cancelled = false;
-    Promise.all(shelterDogs.dogs.map(dog => loadDogSheets(dog.manifest ?? localDogAssetManifest))).then(sheets => {
+    Promise.all(
+      shelterDogs.dogs.map(dog =>
+        dog.manifest
+          ? loadFreshDogSheets(dog.manifest, () => fetchDogAssets(dog.id).then(res => res.data))
+          : loadDogSheets(localDogAssetManifest).then(sheets => ({ manifest: null, sheets })),
+      ),
+    ).then(loaded => {
       if (cancelled) {
         return;
       }
-      shelterDogs.dogs.forEach((dog, index) => {
-        cacheDogPreviewArt(dog.id, dog.manifest ?? localDogAssetManifest, sheets[index] ?? {});
+      // A re-issued manifest has new URLs, and the sheets are keyed by them.
+      const dogs = shelterDogs.dogs.map((dog, index) => ({ ...dog, manifest: loaded[index].manifest }));
+      const sheets = loaded.map(result => result.sheets);
+      dogs.forEach((dog, index) => {
+        cacheDogPreviewArt(dog.id, dog.manifest ?? localDogAssetManifest, sheets[index]);
       });
       setDogSheets(sheets);
       setDogsSpawned(true);
-      setDogMeta(shelterDogs.dogs);
+      setDogMeta(dogs);
       setDogs(
         shelterDogs.dogs.map((_, i) => {
           const slot = mapLayout.slots[i % mapLayout.slots.length];
@@ -668,6 +678,9 @@ export function GameScreen() {
         {shelterDogs.status === 'error' && (
           <View style={styles.statusBanner}>
             <Text style={styles.statusText}>강아지를 못 불러왔어요: {shelterDogs.message}</Text>
+            <Pressable onPress={shelterDogs.retry} hitSlop={8} accessibilityLabel="강아지 다시 불러오기">
+              <Text style={styles.statusRetry}>다시 시도</Text>
+            </Pressable>
           </View>
         )}
       </View>
@@ -749,5 +762,10 @@ const styles = StyleSheet.create({
   statusText: {
     color: '#fff',
     flexShrink: 1,
+  },
+  statusRetry: {
+    color: '#fff',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });

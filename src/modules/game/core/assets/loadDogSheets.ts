@@ -25,3 +25,36 @@ export async function loadDogSheets(manifest: DogAssetManifest): Promise<DogShee
   );
   return Object.fromEntries(urls.map((url, i) => [url, images[i]]));
 }
+
+/** Re-issues after an expired manifest or a failed sheet, before falling back to skeleton sheets. */
+const MAX_REISSUES = 2;
+/** Treat a URL this close to expiry as expired — the download itself takes time. */
+const EXPIRY_MARGIN_MS = 5_000;
+
+/**
+ * loadDogSheets for a signed manifest: checks expiry right before downloading, and on an
+ * expired manifest or a failed sheet asks `reissue` for a fresh one of the SAME dog
+ * (limited retries). Returns the manifest the sheets were keyed by — callers must render
+ * with it, since sheet keys are its URLs.
+ */
+export async function loadFreshDogSheets(
+  manifest: DogAssetManifest,
+  reissue: () => Promise<DogAssetManifest>,
+  now: () => number = Date.now,
+): Promise<{ manifest: DogAssetManifest; sheets: DogSheets }> {
+  let current = manifest;
+  let sheets: DogSheets = {};
+  for (let attempt = 0; attempt <= MAX_REISSUES; attempt++) {
+    const expired = Date.parse(current.expiresAt) - now() < EXPIRY_MARGIN_MS;
+    if (attempt > 0 || expired) {
+      try {
+        current = await reissue();
+      } catch {
+        break;
+      }
+    }
+    sheets = await loadDogSheets(current);
+    if (Object.values(sheets).every(Boolean)) break;
+  }
+  return { manifest: current, sheets };
+}

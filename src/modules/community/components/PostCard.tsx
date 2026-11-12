@@ -2,15 +2,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ChevronRight, MapPin, MessageSquare, Users } from 'lucide-react-native';
 import { fonts } from '../../../shared/lib/fonts';
 import { formatRelativeTime } from '../../../shared/lib/relativeTime';
-import { RemoteImage } from '../../../shared/ui/RemoteImage';
-import { useMediaUrl } from '../hooks/useMediaUrl';
+import { MediaImage } from './MediaImage';
 import { describeOccurredAt, shortRegion } from '../postText';
 import type { CommunityPost } from '../types';
 import { PostChip } from './PostChip';
 
 // Figma "Card / Community lost|found" (382×168).
 export function PostCard({ post, onPress }: { post: CommunityPost; onPress: () => void }) {
-  const photo = useMediaUrl(post.content.mediaIds[0]);
   const { content } = post;
   const when = content.location ? describeOccurredAt(content.location.occurredAt) : null;
   const where = content.regionLabel ? shortRegion(content.regionLabel) : null;
@@ -20,7 +18,7 @@ export function PostCard({ post, onPress }: { post: CommunityPost; onPress: () =
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.photo}>
-        <RemoteImage url={photo} width={106} height={111} radius={12} />
+        <MediaImage mediaId={post.content.mediaIds[0]} width={106} height={111} radius={12} />
       </View>
       <View style={styles.chip}>
         <PostChip category={post.category} />

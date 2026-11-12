@@ -16,6 +16,8 @@ export type DogChatState =
       sendError: string | null;
       /** The USER message whose reply failed with retryable=true, if any. */
       retryableMessageId: string | null;
+      /** A message the server never confirmed — resent with the same clientMessageId so it can't duplicate. */
+      failedSend: { text: string; clientMessageId: string } | null;
     };
 
 /** Opens (or resumes) a dog's chat session and sends messages through it (docs/chat-storage-api.md, docs/grounded-chat-api.md). */
@@ -40,7 +42,7 @@ export function useDogChat(dogId: string, existingSessionId?: string) {
         const { data: messages } = await fetchChatMessages(session.id, { limit: 50 });
         if (!cancelled) {
           loadedChatKey.current = chatKey;
-          setState({ status: 'ready', session, messages, sending: false, sendError: null, retryableMessageId: null });
+          setState({ status: 'ready', session, messages, sending: false, sendError: null, retryableMessageId: null, failedSend: null });
         }
       } catch (err) {
         if (!cancelled) {
@@ -98,24 +100,37 @@ export function useDogChat(dogId: string, existingSessionId?: string) {
     }
   }, []);
 
+  /** Resolves true once the server has stored the message (the reply may still fail separately). */
   const send = useCallback(
-    async (text: string) => {
+    async (text: string): Promise<boolean> => {
       if (state.status !== 'ready' || state.sending || !state.session.canSend) {
-        return;
+        return false;
       }
       const sessionId = state.session.id;
-      setState(prev => (prev.status === 'ready' ? { ...prev, sending: true, sendError: null } : prev));
+      const clientMessageId =
+        state.failedSend?.text === text ? state.failedSend.clientMessageId : generateClientMessageId();
+      setState(prev => (prev.status === 'ready' ? { ...prev, sending: true, sendError: null, failedSend: null } : prev));
 
+      let userMessage: ChatMessage;
       try {
-        const clientMessageId = generateClientMessageId();
-        const { data: userMessage } = await sendChatMessage(sessionId, clientMessageId, text);
-        setState(prev => (prev.status === 'ready' ? { ...prev, messages: [...prev.messages, userMessage] } : prev));
-        // Blocks until the AI call finishes (or fails) server-side — no polling.
-        await requestReply(sessionId, userMessage, false);
+        ({ data: userMessage } = await sendChatMessage(sessionId, clientMessageId, text));
       } catch (err) {
         const message = err instanceof ApiError ? err.message : String(err);
-        setState(prev => (prev.status === 'ready' ? { ...prev, sending: false, sendError: message } : prev));
+        setState(prev =>
+          prev.status === 'ready'
+            ? { ...prev, sending: false, sendError: message, failedSend: { text, clientMessageId } }
+            : prev,
+        );
+        return false;
       }
+      setState(prev =>
+        prev.status === 'ready' && !prev.messages.some(m => m.id === userMessage.id)
+          ? { ...prev, messages: [...prev.messages, userMessage] }
+          : prev,
+      );
+      // Blocks until the AI call finishes (or fails) server-side — no polling.
+      await requestReply(sessionId, userMessage, false);
+      return true;
     },
     [state, requestReply],
   );

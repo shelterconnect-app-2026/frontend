@@ -11,7 +11,7 @@ import { AuthHeader } from './components/AuthHeader';
 import { AuthPrimaryButton } from './components/AuthButtons';
 import { AuthScreenFrame } from './components/AuthScreenFrame';
 import { fetchRegistrationPolicy, type RegistrationPolicy } from './api/policy';
-import { completeServiceSetup, savePendingSignup, type SignupExtras } from './signupFlow';
+import { completeServiceSetup, isAlreadyRegistered, savePendingSignup, type SignupExtras } from './signupFlow';
 import { authErrorMessage, signUpError } from './signupRules';
 import { leaveAuthFlow } from './leaveAuthFlow';
 import type { RootStackParamList } from '../../app/navigation';
@@ -63,6 +63,13 @@ export function SignUpScreen() {
       const { data, error: authError } = await supabase.auth.signUp({ email: email.trim(), password });
       if (authError) {
         throw authError;
+      }
+      if (isAlreadyRegistered(data.user)) {
+        // Don't park the new nickname — it would overwrite the existing account's on its next sign-in.
+        Alert.alert('이미 가입된 이메일이에요', '이 이메일로 로그인해 주세요. 확인 메일을 받지 못했다면 로그인 화면에서 다시 보낼 수 있어요.', [
+          { text: '로그인하기', onPress: () => navigation.replace('Login') },
+        ]);
+        return;
       }
       const extras: SignupExtras = {
         nickname,

@@ -11,9 +11,8 @@ import { ActionSheet, SheetButton } from '../../shared/ui/ActionSheet';
 import { formatClock, formatRoomTime } from '../../shared/lib/chatTime';
 import { formatRelativeTime } from '../../shared/lib/relativeTime';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
-import { RemoteImage } from '../../shared/ui/RemoteImage';
 import { useCommunityComments, useCommunityPost } from './hooks/useCommunityPost';
-import { useMediaUrl } from './hooks/useMediaUrl';
+import { MediaImage } from './components/MediaImage';
 import { createCommunityComment, deleteCommunityComment } from './api/posts';
 import { buildCommentBody } from './composeForm';
 import { groupComments, type CommentThread } from './postText';
@@ -171,7 +170,6 @@ function ThreadCard({ thread, post, ...actions }: { thread: CommentThread; post:
 }
 
 function CommentRow({ comment, post, onShowLocation, onReply, onDelete, canReply }: { comment: CommunityComment; post: CommunityPost | null; canReply?: boolean } & RowActions) {
-  const thumb = useMediaUrl(comment.content?.mediaIds[0]);
   if (comment.deleted || !comment.content) {
     return <Text style={styles.deleted}>삭제된 댓글이에요.</Text>;
   }
@@ -210,7 +208,7 @@ function CommentRow({ comment, post, onShowLocation, onReply, onDelete, canReply
           </Pressable>
         )}
       </View>
-      {!!thumb && <RemoteImage url={thumb} width={120} height={90} radius={10} />}
+      {!!comment.content?.mediaIds[0] && <MediaImage mediaId={comment.content.mediaIds[0]} width={120} height={90} radius={10} />}
       {location && (
         <Pressable style={styles.location} onPress={onShowLocation}>
           <MapPin size={14} color="#b4a0c4" strokeWidth={1.8} />

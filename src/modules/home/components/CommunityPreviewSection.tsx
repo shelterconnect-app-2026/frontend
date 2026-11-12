@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Canvas, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
 import { useCommunityPreview } from '../../community/hooks/useCommunityPreview';
-import { fetchCommunityMediaUrl } from '../../community/api/posts';
+import { MediaImage } from '../../community/components/MediaImage';
 import { fonts } from '../../../shared/lib/fonts';
 import { formatRelativeTime } from '../../../shared/lib/relativeTime';
 import { HomeSvg } from './HomeSvg';
@@ -80,32 +78,10 @@ export function CommunityPreviewSection() {
 }
 
 function PostThumbnail({ mediaId }: { mediaId: string | undefined }) {
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!mediaId) {
-      setUrl(null);
-      return;
-    }
-    let cancelled = false;
-    fetchCommunityMediaUrl(mediaId).then(
-      ({ data }) => !cancelled && setUrl(data.url),
-      () => !cancelled && setUrl(null),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [mediaId]);
-
-  const image = useImage(url ?? undefined);
-
-  if (!image) {
-    return <View style={[styles.thumbnail, styles.thumbnailPlaceholder]} />;
-  }
   return (
-    <Canvas style={styles.thumbnail}>
-      <SkiaImage image={image} x={0} y={0} width={86} height={89} fit="cover" />
-    </Canvas>
+    <View style={styles.thumbnail}>
+      <MediaImage mediaId={mediaId} width={86} height={89} radius={12} />
+    </View>
   );
 }
 
@@ -132,7 +108,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
   },
   thumbnail: { position: 'absolute', left: 15, top: 15, width: 86, height: 89, borderRadius: 12, overflow: 'hidden' },
-  thumbnailPlaceholder: { backgroundColor: '#eee8da' },
   badge: {
     position: 'absolute',
     left: 117,

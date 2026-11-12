@@ -6,9 +6,8 @@ import { ChevronRight, Clock, Maximize2, MapPin, MessageSquare, PawPrint, Share2
 import { fonts } from '../../shared/lib/fonts';
 import { formatRelativeTime } from '../../shared/lib/relativeTime';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
-import { RemoteImage } from '../../shared/ui/RemoteImage';
 import { useCommunityPost } from './hooks/useCommunityPost';
-import { useMediaUrl } from './hooks/useMediaUrl';
+import { MediaImage } from './components/MediaImage';
 import { describeApproxTime, shortRegion } from './postText';
 import { PostBottomActions, PostMenu } from './components/PostActions';
 import { PostChip } from './components/PostChip';
@@ -45,7 +44,6 @@ function PostBody({ post, navigation }: { post: CommunityPost; navigation: Nativ
   const { content } = post;
   const [photoIndex, setPhotoIndex] = useState(0);
   const [zoom, setZoom] = useState(false);
-  const urls = useMediaUrls(content.mediaIds);
   const where = content.location;
   const isNews = post.category === 'NEIGHBOR_NEWS';
   const placeLabel = post.category === 'LOST' ? '마지막 장소' : post.category === 'FOUND' ? '발견한 장소' : '장소';
@@ -86,8 +84,8 @@ function PostBody({ post, navigation }: { post: CommunityPost; navigation: Nativ
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={e => setPhotoIndex(Math.round(e.nativeEvent.contentOffset.x / PHOTO_WIDTH))}
           >
-            {content.mediaIds.map((id, index) => (
-              <RemoteImage key={id} url={urls[index] ?? null} width={PHOTO_WIDTH} height={PHOTO_HEIGHT} radius={18} />
+            {content.mediaIds.map(id => (
+              <MediaImage key={id} mediaId={id} width={PHOTO_WIDTH} height={PHOTO_HEIGHT} radius={18} />
             ))}
           </ScrollView>
           <Pressable style={styles.zoom} onPress={() => setZoom(true)} hitSlop={8}>
@@ -158,7 +156,7 @@ function PostBody({ post, navigation }: { post: CommunityPost; navigation: Nativ
 
       <Modal visible={zoom} transparent animationType="fade" onRequestClose={() => setZoom(false)}>
         <Pressable style={styles.zoomBackdrop} onPress={() => setZoom(false)}>
-          <RemoteImage url={urls[photoIndex] ?? null} width={PHOTO_WIDTH} height={PHOTO_WIDTH * 1.1} radius={14} />
+          <MediaImage mediaId={content.mediaIds[photoIndex]} width={PHOTO_WIDTH} height={PHOTO_WIDTH * 1.1} radius={14} />
           <X size={22} color="#ffffff" strokeWidth={2} style={styles.zoomClose} />
         </Pressable>
       </Modal>
@@ -166,16 +164,6 @@ function PostBody({ post, navigation }: { post: CommunityPost; navigation: Nativ
   );
 }
 
-// useMediaUrl is one id at a time (a hook can't loop) — the post has ≤ 5 photos, so a small
-// fixed set of calls keeps the rules of hooks.
-function useMediaUrls(ids: string[]): (string | null)[] {
-  const a = useMediaUrl(ids[0]);
-  const b = useMediaUrl(ids[1]);
-  const c = useMediaUrl(ids[2]);
-  const d = useMediaUrl(ids[3]);
-  const e = useMediaUrl(ids[4]);
-  return [a, b, c, d, e];
-}
 
 const styles = StyleSheet.create({
   loading: { marginTop: 40 },
