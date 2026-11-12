@@ -54,13 +54,13 @@ export function LoginScreen() {
     setNotice(null);
     setNeedsConfirmation(false);
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (authError) {
         throw authError;
       }
       // "앱에서 연결할 순서" (auth-and-permissions.md): 로그인 직후 서비스 사용자 등록. 이메일 확인을
       // 거쳐 가입한 사용자의 보관해 둔 닉네임·동의는 여기서 처음 서버에 보낸다.
-      if (!(await applyPendingSignup(email))) {
+      if (!(await applyPendingSignup(email, data.user.id))) {
         await registerServiceUser();
       }
       leaveAuthFlow(navigation);

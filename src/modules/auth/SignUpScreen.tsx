@@ -83,7 +83,9 @@ export function SignUpScreen() {
         return;
       }
       // 이메일 확인이 필요한 프로젝트 설정 — 확인 후 첫 로그인 때 닉네임·동의를 적용한다.
-      await savePendingSignup(email, extras);
+      if (data.user) {
+        await savePendingSignup(email, data.user.id, extras);
+      }
       Alert.alert('확인 메일을 보냈어요', '메일의 확인 링크를 누른 뒤 로그인해 주세요.', [
         { text: '확인', onPress: () => navigation.replace('Login') },
       ]);

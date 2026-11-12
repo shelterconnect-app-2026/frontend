@@ -24,24 +24,24 @@ test('applies register → nickname → consent in order, then clears the parked
   (updateDisplayName as jest.Mock).mockImplementation(async () => calls.push('nickname'));
   (saveConsents as jest.Mock).mockImplementation(async () => calls.push('consent'));
 
-  await savePendingSignup('Puppy@Example.com', { nickname: ' 두부네 ', consent });
-  expect(await applyPendingSignup('puppy@example.com')).toBe(true);
+  await savePendingSignup('Puppy@Example.com', 'u1', { nickname: ' 두부네 ', consent });
+  expect(await applyPendingSignup('puppy@example.com', 'u1')).toBe(true);
 
   expect(calls).toEqual(['register', 'nickname', 'consent']);
   expect(updateDisplayName).toHaveBeenCalledWith('두부네');
-  expect(await applyPendingSignup('puppy@example.com')).toBe(false);
+  expect(await applyPendingSignup('puppy@example.com', 'u1')).toBe(false);
 });
 
 test('skips consent when the documents are not published yet', async () => {
-  await savePendingSignup('a@b.co', { nickname: 'x', consent: null });
-  await applyPendingSignup('a@b.co');
+  await savePendingSignup('a@b.co', 'u1', { nickname: 'x', consent: null });
+  await applyPendingSignup('a@b.co', 'u1');
   expect(saveConsents).not.toHaveBeenCalled();
 });
 
 test('keeps the parked data when applying fails so the next sign-in retries', async () => {
   (updateDisplayName as jest.Mock).mockRejectedValueOnce(new Error('boom'));
-  await savePendingSignup('c@d.co', { nickname: 'x', consent });
-  await expect(applyPendingSignup('c@d.co')).rejects.toThrow('boom');
+  await savePendingSignup('c@d.co', 'u1', { nickname: 'x', consent });
+  await expect(applyPendingSignup('c@d.co', 'u1')).rejects.toThrow('boom');
   expect(await AsyncStorage.getItem('pendingSignup:c@d.co')).not.toBeNull();
 });
 
@@ -49,4 +49,11 @@ test('an already-registered email is recognised by its empty identities', () => 
   expect(isAlreadyRegistered({ identities: [] })).toBe(true);
   expect(isAlreadyRegistered({ identities: [{ provider: 'email' }] })).toBe(false);
   expect(isAlreadyRegistered(null)).toBe(false);
+});
+
+test('never applies parked data to a different account with the same email', async () => {
+  await savePendingSignup('x@y.co', 'u1', { nickname: 'wrong', consent });
+  expect(await applyPendingSignup('x@y.co', 'u2')).toBe(false);
+  expect(updateDisplayName).not.toHaveBeenCalled();
+  expect(await AsyncStorage.getItem('pendingSignup:x@y.co')).toBeNull();
 });
