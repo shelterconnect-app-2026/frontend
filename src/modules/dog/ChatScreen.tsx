@@ -127,7 +127,8 @@ export function ChatScreen() {
   const ready = state.status === 'ready';
   const messages = ready ? state.messages : [];
   const replies = messages.filter(message => message.role === 'ASSISTANT');
-  const selectedReply = replies[dialogueIndex ?? replies.length - 1];
+  const selectedReplyIndex = dialogueIndex ?? replies.length - 1;
+  const selectedReply = replies[selectedReplyIndex];
   const lastQuestion = [...messages].reverse().find(message => message.role === 'USER');
   const canSend = ready && state.session.canSend;
   const sending = ready && state.sending;
@@ -140,7 +141,9 @@ export function ChatScreen() {
     setMenu(false);
     navigation.navigate('Profile', {
       dogId: params.dogId, dogName, identityIndex: params.identityIndex,
-      shelterName: params.shelterName, knownFacts: replies.map(message => message.text), pendingQuestions,
+      shelterName: params.shelterName,
+      knownFacts: replies.filter(message => !message.needsShelterConfirmation).map(message => message.text),
+      pendingQuestions,
     });
   };
   const openLogin = () => {
@@ -218,7 +221,7 @@ export function ChatScreen() {
                 {replies.length > 1 && <Pressable style={styles.nextButton} onPress={() => setDialogueIndex(index => index === null ? 0 : (index + 1) % replies.length)} accessibilityLabel="다른 대화 보기"><ChevronDown size={25} color="#7d8750" fill="#7d8750" /></Pressable>}
               </View>
               {ready && state.sendError && <View style={styles.errorRow}><Text style={styles.errorText}>{state.sendError}</Text>{state.retryableMessageId && <Pressable onPress={retrySend}><Text style={styles.errorRetry}>다시 시도</Text></Pressable>}</View>}
-              {selectedReply?.needsShelterConfirmation && lastQuestion && <Pressable style={styles.confirmButton} onPress={() => setPendingQuestions(previous => previous.includes(lastQuestion.text) ? previous : [...previous, lastQuestion.text])} disabled={pendingQuestions.includes(lastQuestion.text)}><Text style={styles.confirmText}>{pendingQuestions.includes(lastQuestion.text) ? '보호소 확인 질문에 담았어요' : '보호소에 확인할 질문으로 담기'}</Text></Pressable>}
+              {selectedReplyIndex > 0 && selectedReply?.needsShelterConfirmation && lastQuestion && <Pressable style={styles.confirmButton} onPress={() => setPendingQuestions(previous => previous.includes(lastQuestion.text) ? previous : [...previous, lastQuestion.text])} disabled={pendingQuestions.includes(lastQuestion.text)}><Text style={styles.confirmText}>{pendingQuestions.includes(lastQuestion.text) ? '보호소 확인 질문에 담았어요' : '보호소에 확인할 질문으로 담기'}</Text></Pressable>}
               <View style={styles.composer}>
                 <TextInput style={styles.input} value={draft} onChangeText={setDraft} placeholder={dogName + '에게 답장하기…'} placeholderTextColor="#828572" editable={canSend && !sending} maxLength={300} returnKeyType="send" onSubmitEditing={() => submit()} accessibilityLabel="강아지에게 메시지 입력" />
                 <Pressable style={[styles.sendButton, (!draft.trim() || !canSend || sending) && styles.sendDisabled]} onPress={() => submit()} disabled={!draft.trim() || !canSend || sending} accessibilityLabel="메시지 보내기"><Send size={20} color="#fff9e8" fill="#fff9e8" /></Pressable>

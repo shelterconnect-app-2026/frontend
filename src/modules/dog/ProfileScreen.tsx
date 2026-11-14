@@ -1,19 +1,21 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { useImage } from '@shopify/react-native-skia';
+import { Canvas, Image as SkiaImage, Skia, useImage } from '@shopify/react-native-skia';
 import { ChevronLeft, Heart } from 'lucide-react-native';
-// Same cross-module reuse as ChatScreen — see the comment there.
-import { dogWalkAtlas } from '../game/core/assets/dog/dogWalkAtlas';
 import { fonts } from '../../shared/lib/fonts';
-import { RemoteImage } from '../../shared/ui/RemoteImage';
 import { formatBirthDate } from './birthDate';
-import { DogSprite } from './console/DogSprite';
+import { RealDogSprite } from './console/RealDogSprite';
 import { useDogProfile } from './hooks/useDogProfile';
 import { useDogSaved } from './hooks/useDogSaved';
+import { fetchDogAssets, fetchDogPhotos } from './api/shelters';
+import { getDogPreviewArt } from './api/dogAssetPreviewCache';
 import { displayDogName, withKoreanConjunction } from './displayDogName';
+import { displayDogIntroduction } from './displayDogIntroduction';
+import type { GardenDogArt } from './garden/GardenScene';
+import type { DogPhoto } from './types';
 import { Clip, HeartSticker, PawSticker, Sparkle, Tape, Ticket } from './profile/Decor';
 import type { RootStackParamList } from '../../app/navigation';
 
@@ -29,10 +31,32 @@ export function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { params } = useRoute<RouteProp<RootStackParamList, 'Profile'>>();
   const dogName = displayDogName(params.dogName);
-  const dogSheet = useImage(dogWalkAtlas);
+  const [dogArt, setDogArt] = useState<GardenDogArt | null>(() => getDogPreviewArt(params.dogId)?.idle ?? null);
   const state = useDogProfile(params.dogId);
   const dogSaved = useDogSaved(params.dogId);
   const [showRealPhoto, setShowRealPhoto] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cached = getDogPreviewArt(params.dogId)?.idle;
+    if (cached) {
+      setDogArt(cached);
+      return;
+    }
+    setDogArt(null);
+    (async () => {
+      try {
+        const { data: manifest } = await fetchDogAssets(params.dogId);
+        const clip = manifest.mapDirections?.DOWN?.IDLE ?? manifest.animations.IDLE;
+        if (!clip?.frames.length) return;
+        const image = Skia.Image.MakeImageFromEncoded(await Skia.Data.fromURI(clip.spritesheetUrl));
+        if (!cancelled && image) setDogArt({ image, clip });
+      } catch {
+        // Leave an unavailable sprite empty rather than showing another dog's art.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [params.dogId]);
 
   const body = (() => {
     if (state.status === 'loading') {
@@ -69,7 +93,7 @@ export function ProfileScreen() {
                 <Tape />
                 <Text style={styles.photoNote}>나랑 친구할래? ↘</Text>
                 <View style={styles.portraitImage}>
-                  {showPhoto ? <RemoteImage url={showPhoto.url} width={118} height={137} radius={2} /> : <DogSprite sheet={dogSheet} identityIndex={params.identityIndex} size={137} />}
+                  {showPhoto ? <SignedProfilePhoto dogId={params.dogId} photo={showPhoto} /> : <RealDogSprite art={dogArt} size={118} />}
                 </View>
                 <Text style={styles.portraitCaption}>HELLO, {profile.name.toUpperCase()} ♡</Text>
               </View>
@@ -131,14 +155,14 @@ export function ProfileScreen() {
           <View style={styles.memo}>
             <View style={styles.notes}>
               <Text style={styles.notesTitle}>우리, 이렇게 친해져요</Text>
-              <Text style={styles.notesText}>{profile.introduction ?? `${profile.name}에 대한 소개 글은 아직 없어요.\n대화하며 조금씩 알아가 봐요.`}</Text>
+              <Text style={styles.notesText}>{displayDogIntroduction(profile.introduction, profile.name)}</Text>
               <Text style={styles.handHeart}>♡</Text>
             </View>
             <View style={styles.polaroid}>
               <View style={styles.polaroidScene}>
                 <View style={styles.polaroidCloud} />
                 <View style={styles.polaroidDog}>
-                  <DogSprite sheet={dogSheet} identityIndex={params.identityIndex} size={83} />
+                  <RealDogSprite art={dogArt} size={83} />
                 </View>
               </View>
               <Text style={styles.polaroidCaption}>너랑 걷고 싶어 ♪</Text>
@@ -210,6 +234,58 @@ export function ProfileScreen() {
   );
 }
 
+function SignedProfilePhoto({ dogId, photo }: { dogId: string; photo: DogPhoto }) {
+  const [bytes, setBytes] = useState<Uint8Array | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const image = useImage(bytes);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBytes(null);
+    setLoadError(false);
+    (async () => {
+      const renewUrl = async () => {
+        const { data: photos } = await fetchDogPhotos(dogId);
+        const renewed = photos.find(item => item.id === photo.id);
+        if (!renewed) throw new Error('Photo no longer available');
+        return renewed.url;
+      };
+      try {
+        const expiresAt = Date.parse(photo.expiresAt);
+        const renewed = retry > 0 || (Number.isFinite(expiresAt) && expiresAt <= Date.now() + 5_000);
+        let url = renewed ? await renewUrl() : photo.url;
+        let response = await fetch(url);
+        if (!response.ok && response.status >= 400 && response.status < 500 && !renewed) {
+          url = await renewUrl();
+          response = await fetch(url);
+        }
+        if (!response.ok) throw new Error(`Photo HTTP ${response.status}`);
+        const buffer = await response.arrayBuffer();
+        if (!cancelled) setBytes(new Uint8Array(buffer));
+      } catch {
+        if (!cancelled) setLoadError(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [dogId, photo.expiresAt, photo.id, photo.url, retry]);
+
+  if (loadError) return (
+    <View style={styles.photoFeedback}>
+      <Text style={styles.photoFeedbackText}>사진을 불러오지 못했어요</Text>
+      <Pressable onPress={() => setRetry(value => value + 1)} accessibilityLabel="사진 다시 불러오기">
+        <Text style={styles.photoRetry}>다시 시도</Text>
+      </Pressable>
+    </View>
+  );
+  if (!image) return <ActivityIndicator color="#8b7a64" />;
+  return (
+    <Canvas style={styles.photoCanvas}>
+      <SkiaImage image={image} x={0} y={0} width={118} height={137} fit="cover" />
+    </Canvas>
+  );
+}
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View style={styles.section}>
@@ -240,6 +316,10 @@ const styles = StyleSheet.create({
   portrait: { alignSelf: 'stretch', marginTop: 6, paddingTop: 18, paddingBottom: 12, paddingHorizontal: 2, alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#f4f0e9', transform: [{ rotate: '-4deg' }], shadowColor: '#5c4c44', shadowOpacity: 0.16, shadowRadius: 8, shadowOffset: { width: 3, height: 5 } },
   photoNote: { alignSelf: 'flex-end', marginRight: 6, fontFamily: fonts.body, fontSize: 9, color: '#759db2', transform: [{ rotate: '-5deg' }] },
   portraitImage: { width: 118, height: 137, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  photoCanvas: { width: 118, height: 137 },
+  photoFeedback: { width: 118, height: 137, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  photoFeedbackText: { fontFamily: fonts.body, fontSize: 11, color: '#7b6251', textAlign: 'center' },
+  photoRetry: { fontFamily: fonts.body, fontSize: 11, color: '#516d83', marginTop: 8, textDecorationLine: 'underline' },
   portraitCaption: { fontFamily: fonts.pixel, fontSize: 8, letterSpacing: 0.6, color: '#92786b', paddingTop: 6 },
   switchRow: { flexDirection: 'row', gap: 6, marginTop: 14 },
   switchPill: { height: 24, paddingHorizontal: 12, justifyContent: 'center', backgroundColor: '#f6f0e4', borderWidth: 1, borderColor: '#e5d9c9', borderRadius: 12 },

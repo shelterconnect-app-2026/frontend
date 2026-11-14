@@ -16,6 +16,7 @@ import { svgAssets } from './assets/svgAssets';
 import { fetchDog } from './api/shelters';
 import { unsaveDog } from './api/savedDogs';
 import { useSavedDogsList } from './hooks/useSavedDogs';
+import { displayDogIntroduction } from './displayDogIntroduction';
 import type { HomeTabScreenNavigationProp } from '../../app/navigation';
 import type { SavedDog } from './types';
 
@@ -213,7 +214,7 @@ function FriendCard({ dog, index, onUnsave, onProfile, onChat }: FriendCardProps
       ({ data }) => {
         if (!cancelled) {
           setTrait(data.traitLabels[0] ?? null);
-          setIntro(data.introduction);
+          setIntro(displayDogIntroduction(data.introduction, data.name));
         }
       },
       () => undefined,
